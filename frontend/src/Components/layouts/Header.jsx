@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import EditIcon from '@mui/icons-material/Edit';
 import LogoutIcon from '@mui/icons-material/Logout';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import logo from '../logo/logo.png'; // Correct path for Components/layouts/Header.jsx
+import logo from '../logo/logo.png';
 
 const Header = () => {
   const [user, setUser] = useState(null);
@@ -189,14 +189,16 @@ const Header = () => {
         }
 
         .nav-link {
-          color: rgba(255, 255, 255, 0.85);
+          color: rgba(255, 255, 255, 0.8);
           font-weight: 500;
           cursor: pointer;
-          padding: 8px 16px;
-          border-radius: 8px;
+          padding: 8px 20px;
+          border-radius: 50px;
           transition: all 0.3s ease;
           font-size: 0.95rem;
           position: relative;
+          background: transparent;
+          letter-spacing: 0.3px;
         }
 
         .nav-link:hover {
@@ -209,18 +211,18 @@ const Header = () => {
           color: white;
           background: rgba(255, 255, 255, 0.2);
           font-weight: 600;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+          box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
         }
 
         .nav-link.active::after {
           content: '';
           position: absolute;
-          bottom: 2px;
+          bottom: 4px;
           left: 50%;
           transform: translateX(-50%);
-          width: 60%;
+          width: 24px;
           height: 3px;
-          background: white;
+          background: #4ade80;
           border-radius: 2px;
         }
 
@@ -374,6 +376,7 @@ const Header = () => {
           transition: all 0.3s ease;
           background: rgba(255, 255, 255, 0.08);
           font-size: 1.8rem;
+          line-height: 1;
         }
 
         .mobile-menu-btn:hover {
@@ -405,6 +408,9 @@ const Header = () => {
           cursor: pointer;
           transition: all 0.3s ease;
           border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+          text-align: center;
+          font-size: 1rem;
+          letter-spacing: 0.5px;
         }
 
         .mobile-nav-link:hover {
@@ -425,7 +431,7 @@ const Header = () => {
           }
 
           .nav-link {
-            padding: 6px 12px;
+            padding: 6px 14px;
             font-size: 0.85rem;
           }
         }

@@ -90,7 +90,6 @@ const Product = () => {
       const data = await response.json();
 
       if (response.ok) {
-        // Filter only available products
         const availableProducts = (data.products || []).filter(p => p.isAvailable !== false);
         setProducts(availableProducts);
       } else {
@@ -144,11 +143,9 @@ const Product = () => {
   };
 
   const getFarmerAvatar = (product) => {
-    // Check if farmerAvatar is directly on the product
     if (product.farmerAvatar) {
       return product.farmerAvatar.startsWith('http') ? product.farmerAvatar : `${API_BASE_URL}${product.farmerAvatar}`;
     }
-    // Fallback to farmer object
     if (product.farmer?.avatar?.url) {
       return product.farmer.avatar.url.startsWith('http') ? product.farmer.avatar.url : `${API_BASE_URL}${product.farmer.avatar.url}`;
     }
@@ -175,7 +172,6 @@ const Product = () => {
     return null;
   };
 
-  // Filter products
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           product.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -187,40 +183,23 @@ const Product = () => {
   // ── Loading State ──
   if (loading) {
     return (
-      <>
+      <div className="full-bleed w-full min-h-screen bg-white flex flex-col">
         <UserHeader />
         <style>{`
           @keyframes prod-spin { to { transform: rotate(360deg); } }
         `}</style>
-        <div style={{
-          minHeight: '100vh',
-          background: '#f5f7f5',
-          paddingTop: '80px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{
-              width: '48px',
-              height: '48px',
-              border: '4px solid #c8e6c9',
-              borderTopColor: '#2E7D32',
-              borderRadius: '50%',
-              animation: 'prod-spin 0.9s linear infinite',
-              margin: '0 auto 16px'
-            }} />
-            <p style={{ color: '#546e7a', fontFamily: "'DM Sans', sans-serif", fontSize: '0.95rem' }}>
-              Loading products...
-            </p>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading products...</p>
           </div>
         </div>
-      </>
+      </div>
     );
   }
 
   return (
-    <>
+    <div className="full-bleed w-full min-h-screen bg-white flex flex-col">
       <UserHeader />
 
       <style>{`
@@ -237,15 +216,14 @@ const Product = () => {
 
         .prod-root {
           font-family: 'DM Sans', sans-serif;
-          min-height: 100vh;
-          background: #f5f7f5;
-          padding-top: 80px;
+          flex: 1;
+          background: #f9fafb;
+          padding: 32px 20px 60px;
         }
 
         .prod-container {
           max-width: 1280px;
           margin: 0 auto;
-          padding: 32px 20px 60px;
         }
 
         /* ── Header ── */
@@ -721,6 +699,21 @@ const Product = () => {
           .prod-card-actions { flex-wrap: wrap; }
           .prod-action-btn { flex: 1; min-width: 80px; }
         }
+
+        @media (max-width: 480px) {
+          .prod-root { padding: 16px 12px; }
+          .prod-header-left h1 { font-size: 1.5rem; }
+          .prod-header-actions { gap: 8px; }
+          .prod-search-input { width: 100%; font-size: 0.85rem; }
+          .prod-stats { gap: 12px; padding: 12px 16px; }
+          .prod-stat { font-size: 0.78rem; }
+          .prod-stat strong { font-size: 0.9rem; }
+          .prod-categories { gap: 6px; }
+          .prod-cat-btn { padding: 6px 14px; font-size: 0.75rem; }
+          .prod-card-body { padding: 14px 16px; }
+          .prod-card-name { font-size: 0.95rem; }
+          .prod-card-price { font-size: 1rem; }
+        }
       `}</style>
 
       <div className="prod-root">
@@ -902,8 +895,7 @@ const Product = () => {
           )}
         </div>
       </div>
-
-    </>
+    </div>
   );
 };
 

@@ -269,7 +269,6 @@ const EditProfile = () => {
           street: data.user.address?.street || '',
           zipcode: data.user.address?.zipcode || data.user.address?.zipCode || ''
         });
-        // Set avatar preview if exists
         if (data.user.avatar?.url || data.user.profilePicture?.url) {
           const avatarUrl = data.user.avatar?.url || data.user.profilePicture?.url;
           setAvatarPreview(avatarUrl.startsWith('http') ? avatarUrl : `${API_BASE_URL}${avatarUrl}`);
@@ -300,12 +299,10 @@ const EditProfile = () => {
   const handleAvatarChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Validate file type
       if (!file.type.startsWith('image/')) {
         setMessage({ type: 'error', text: 'Please select an image file' });
         return;
       }
-      // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
         setMessage({ type: 'error', text: 'Image size must be less than 5MB' });
         return;
@@ -337,7 +334,6 @@ const EditProfile = () => {
     formDataToSend.append('street', formData.street.trim());
     formDataToSend.append('zipcode', formData.zipcode.trim());
 
-    // Append avatar if changed
     if (avatarFile) {
       formDataToSend.append('avatar', avatarFile);
     }
@@ -354,7 +350,6 @@ const EditProfile = () => {
       const data = await response.json();
 
       if (response.ok) {
-        // Update local storage with new user data
         const updatedUser = { ...user, ...data.user };
         localStorage.setItem('user', JSON.stringify(updatedUser));
         setUser(updatedUser);
@@ -401,43 +396,26 @@ const EditProfile = () => {
 
   const getInitial = (name) => name?.charAt(0)?.toUpperCase() || 'U';
 
-  // ── Loading State ────────────────────────────────────────────────────
+  // ── Loading State ──
   if (loading) {
     return (
-      <>
+      <div className="full-bleed w-full min-h-screen bg-white flex flex-col">
         <Header />
         <style>{`
           @keyframes ep-spin { to { transform: rotate(360deg); } }
         `}</style>
-        <div style={{
-          minHeight: '100vh',
-          background: '#f5f7f5',
-          paddingTop: '80px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{
-              width: '48px',
-              height: '48px',
-              border: '4px solid #dbeafe',
-              borderTopColor: '#2563EB',
-              borderRadius: '50%',
-              animation: 'ep-spin 0.9s linear infinite',
-              margin: '0 auto 16px'
-            }} />
-            <p style={{ color: '#546e7a', fontFamily: "'DM Sans', sans-serif", fontSize: '0.95rem' }}>
-              Loading profile...
-            </p>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading profile...</p>
           </div>
         </div>
-      </>
+      </div>
     );
   }
 
   return (
-    <>
+    <div className="full-bleed w-full min-h-screen bg-white flex flex-col">
       <Header />
 
       <style>{`
@@ -459,28 +437,27 @@ const EditProfile = () => {
 
         .ep-root {
           font-family: 'DM Sans', sans-serif;
-          min-height: 100vh;
-          background: #f5f7f5;
-          padding-top: 80px;
+          flex: 1;
+          background: #f9fafb;
+          padding: 32px 20px 60px;
         }
 
         .ep-container {
           max-width: 820px;
           margin: 0 auto;
-          padding: 32px 20px 60px;
         }
 
         .ep-card {
           background: #ffffff;
           border-radius: 16px;
-          box-shadow: 0 2px 20px rgba(37, 99, 235, 0.08);
-          border: 1px solid #dbeafe;
+          box-shadow: 0 2px 20px rgba(5, 150, 105, 0.08);
+          border: 1px solid #d1fae5;
           animation: ep-fadeup 0.4s ease both;
           overflow: hidden;
         }
 
         .ep-header {
-          background: linear-gradient(135deg, #1e40af, #2563eb);
+          background: linear-gradient(135deg, #059669, #047857);
           padding: 24px 32px;
           display: flex;
           justify-content: space-between;
@@ -558,7 +535,7 @@ const EditProfile = () => {
           align-items: center;
           margin-bottom: 28px;
           padding-bottom: 28px;
-          border-bottom: 1.5px solid #dbeafe;
+          border-bottom: 1.5px solid #d1fae5;
         }
 
         .ep-avatar-wrapper {
@@ -571,8 +548,8 @@ const EditProfile = () => {
           height: 120px;
           border-radius: 50%;
           overflow: hidden;
-          border: 3px solid #2563eb;
-          background: #dbeafe;
+          border: 3px solid #059669;
+          background: #d1fae5;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -593,14 +570,14 @@ const EditProfile = () => {
           font-family: 'DM Serif Display', serif;
           font-size: 3rem;
           font-weight: 700;
-          color: #2563eb;
+          color: #059669;
         }
 
         .ep-avatar-overlay {
           position: absolute;
           bottom: 0;
           right: 0;
-          background: linear-gradient(135deg, #2563eb, #3b82f6);
+          background: linear-gradient(135deg, #059669, #047857);
           border-radius: 50%;
           width: 36px;
           height: 36px;
@@ -665,8 +642,8 @@ const EditProfile = () => {
 
         .ep-form-input:focus {
           outline: none;
-          border-color: #3b82f6;
-          box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+          border-color: #059669;
+          box-shadow: 0 0 0 4px rgba(5, 150, 105, 0.1);
           background: #fff;
         }
 
@@ -693,8 +670,8 @@ const EditProfile = () => {
           align-items: center;
           gap: 12px;
           padding: 14px 18px;
-          background: #eff6ff;
-          border: 1.5px dashed #3b82f6;
+          background: #ecfdf5;
+          border: 1.5px dashed #059669;
           border-radius: 10px;
           margin-top: 4px;
         }
@@ -707,13 +684,13 @@ const EditProfile = () => {
         }
 
         .ep-location-detect .highlight {
-          color: #2563eb;
+          color: #059669;
           font-weight: 600;
         }
 
         .ep-detect-btn {
           padding: 8px 18px;
-          background: linear-gradient(135deg, #2563eb, #3b82f6);
+          background: linear-gradient(135deg, #059669, #047857);
           color: #fff;
           border: none;
           border-radius: 8px;
@@ -763,7 +740,7 @@ const EditProfile = () => {
           gap: 14px;
           margin-top: 8px;
           padding-top: 24px;
-          border-top: 1.5px solid #dbeafe;
+          border-top: 1.5px solid #d1fae5;
         }
 
         .ep-btn {
@@ -794,15 +771,15 @@ const EditProfile = () => {
         }
 
         .ep-btn-primary {
-          background: linear-gradient(135deg, #2563eb, #3b82f6);
+          background: linear-gradient(135deg, #059669, #047857);
           color: #fff;
-          box-shadow: 0 4px 16px rgba(37, 99, 235, 0.25);
+          box-shadow: 0 4px 16px rgba(5, 150, 105, 0.25);
         }
 
         .ep-btn-secondary {
-          background: #eff6ff;
-          color: #2563eb;
-          border: 1.5px solid #bfdbfe;
+          background: #ecfdf5;
+          color: #059669;
+          border: 1.5px solid #a7f3d0;
         }
 
         /* ── Modal ── */
@@ -837,8 +814,8 @@ const EditProfile = () => {
           justify-content: space-between;
           align-items: center;
           padding: 18px 22px;
-          border-bottom: 1px solid #dbeafe;
-          background: linear-gradient(135deg, #1e40af, #2563eb);
+          border-bottom: 1px solid #d1fae5;
+          background: linear-gradient(135deg, #059669, #047857);
           border-radius: 16px 16px 0 0;
         }
 
@@ -880,8 +857,8 @@ const EditProfile = () => {
         .ep-loc-spinner {
           width: 44px;
           height: 44px;
-          border: 3px solid #dbeafe;
-          border-top-color: #2563eb;
+          border: 3px solid #d1fae5;
+          border-top-color: #059669;
           border-radius: 50%;
           animation: ep-spin 0.9s linear infinite;
           margin: 0 auto 16px;
@@ -896,7 +873,7 @@ const EditProfile = () => {
         .ep-retry-btn {
           margin-top: 14px;
           padding: 10px 24px;
-          background: linear-gradient(135deg, #2563eb, #3b82f6);
+          background: linear-gradient(135deg, #059669, #047857);
           color: #fff;
           border: none;
           border-radius: 8px;
@@ -977,7 +954,7 @@ const EditProfile = () => {
         .ep-confirm-btn {
           flex: 2;
           padding: 12px;
-          background: linear-gradient(135deg, #2563eb, #3b82f6);
+          background: linear-gradient(135deg, #059669, #047857);
           color: #fff;
           border: none;
           border-radius: 8px;
@@ -989,7 +966,7 @@ const EditProfile = () => {
           align-items: center;
           justify-content: center;
           gap: 7px;
-          box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
+          box-shadow: 0 4px 14px rgba(5, 150, 105, 0.25);
           transition: opacity 0.2s;
         }
 
@@ -1000,9 +977,9 @@ const EditProfile = () => {
         .ep-cancel-btn {
           flex: 1;
           padding: 12px;
-          background: #eff6ff;
+          background: #ecfdf5;
           color: #546e7a;
-          border: 1px solid #bfdbfe;
+          border: 1px solid #a7f3d0;
           border-radius: 8px;
           font-family: 'DM Sans', sans-serif;
           font-size: 0.88rem;
@@ -1016,7 +993,7 @@ const EditProfile = () => {
         }
 
         .ep-cancel-btn:hover {
-          background: #dbeafe;
+          background: #d1fae5;
         }
 
         /* ── Hidden file input ── */
@@ -1034,33 +1011,41 @@ const EditProfile = () => {
           .ep-avatar-ring { width: 100px; height: 100px; }
           .ep-avatar-overlay { width: 30px; height: 30px; }
         }
+
+        @media (max-width: 480px) {
+          .ep-root { padding: 16px 12px; }
+          .ep-header h1 { font-size: 1.2rem; }
+          .ep-body { padding: 16px; }
+          .ep-card { border-radius: 12px; }
+          .ep-btn { padding: 12px 20px; font-size: 0.85rem; }
+        }
       `}</style>
 
       <div className="ep-root">
         <div className="ep-container">
           <div className="ep-card">
 
-        {/* ── Header ── */}
-          <div className="ep-header">
-            <div className="ep-header-left">
-              <div className="ep-header-icon">
-                <UserIcon size={22} />
+            {/* ── Header ── */}
+            <div className="ep-header">
+              <div className="ep-header-left">
+                <div className="ep-header-icon">
+                  <UserIcon size={22} />
+                </div>
+                <div>
+                  <h1>Edit Profile</h1>
+                  <p>Update your personal information</p>
+                </div>
               </div>
-              <div>
-                <h1>Edit Profile</h1>
-                <p>Update your personal information</p>
+              <div className="ep-header-actions">
+                <button
+                  type="button"
+                  className="ep-header-btn"
+                  onClick={handleChangePassword}
+                >
+                  <LockIcon size={16} /> Change Password
+                </button>
               </div>
             </div>
-            <div className="ep-header-actions">
-              <button
-                type="button"
-                className="ep-header-btn"
-                onClick={handleChangePassword}
-              >
-                <LockIcon size={16} /> Change Password
-              </button>
-            </div>
-          </div>
 
             {/* ── Body ── */}
             <div className="ep-body">
@@ -1195,7 +1180,7 @@ const EditProfile = () => {
 
                   {/* ── Detect Location ── */}
                   <div className="ep-location-detect">
-                    <MapPinIcon size={18} color="#2563eb" />
+                    <MapPinIcon size={18} color="#059669" />
                     <p>
                       Use <span className="highlight">GPS</span> to automatically fill your address
                     </p>
@@ -1320,7 +1305,7 @@ const EditProfile = () => {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 };
 
