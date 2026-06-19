@@ -46,7 +46,7 @@ exports.createProduct = async (req, res) => {
         if (req.files && req.files.length > 0) {
             for (const file of req.files) {
                 try {
-                    const result = await uploadToCloudinary(file.path, 'web/products');
+                    const result = await uploadToCloudinary(file.path, 'Mapa-Milihan/products');
                     images.push({
                         public_id: result.public_id,
                         url: result.url
@@ -341,7 +341,7 @@ exports.updateProduct = async (req, res) => {
             const newImages = [];
             for (const file of req.files) {
                 try {
-                    const result = await uploadToCloudinary(file.path, 'web/products');
+                    const result = await uploadToCloudinary(file.path, 'Mapa-Milihan/products');
                     newImages.push({
                         public_id: result.public_id,
                         url: result.url

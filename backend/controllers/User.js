@@ -754,7 +754,7 @@ exports.updateProfile = async (req, res) => {
         }
 
         // Upload new avatar
-        const avatarResult = await uploadToCloudinary(req.file.path, 'web/avatars');
+        const avatarResult = await uploadToCloudinary(req.file.path, 'Mapa-Milihan/avatars');
         updateData.avatar = {
           public_id: avatarResult.public_id,
           url: avatarResult.url

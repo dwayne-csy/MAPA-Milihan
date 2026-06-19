@@ -226,8 +226,14 @@ const CreateProduct = () => {
     }
   };
 
-  const categories = ['Vegetables', 'Fruits', 'Rice', 'Corn', 'Livestock', 'Poultry', 'Dairy', 'Herbs', 'Others'];
-  const units = ['kg', 'gram', 'piece', 'bundle', 'box', 'sack', 'dozen', 'liter'];
+  const categories = ['Fruits', 'Vegetables', 'Grains', 'Livestock', 'Others'];
+  const units = [
+    { value: 'kg', label: 'Per Kilo (KG)' },
+    { value: 'tray', label: 'Per Tray (tray)' },
+    { value: 'sack', label: 'Per Sack (sack)' },
+    { value: 'pc', label: 'Per Piece (pc)' },
+    { value: 'L', label: 'Per Liter (L)' }
+  ];
 
   return (
     <>
@@ -776,7 +782,7 @@ const CreateProduct = () => {
                     className="cp-form-select"
                   >
                     {units.map(unit => (
-                      <option key={unit} value={unit}>{unit}</option>
+                      <option key={unit.value} value={unit.value}>{unit.label}</option>
                     ))}
                   </select>
                 </div>

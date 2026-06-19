@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import UserHeader from '../layouts/Header';
+import { getUnitLabel, getUnitFullLabel, getPricePerUnit, getQuantityDisplay, getStockStatus } from '../utils/unitHelpers';
 
 // ── Icons ───────────────────────────────────────────────────────────────
 const ArrowLeftIcon = ({ size = 20 }) => (
@@ -136,10 +137,6 @@ const ProductDetails = () => {
         }
       });
     }
-  };
-
-  const handleAddToCart = () => {
-    alert('Add to Cart functionality coming soon!');
   };
 
   const handlePurchase = () => {
@@ -303,6 +300,9 @@ const ProductDetails = () => {
   const farmerAvatar = getFarmerAvatar(product);
   const farmerName = product.farmer?.name || 'Unknown Farmer';
   const locationDisplay = getLocationDisplay();
+  const unitLabel = getUnitLabel(product.unit);
+  const unitFullLabel = getUnitFullLabel(product.unit);
+  const stockStatus = getStockStatus(Number(product.quantity) || 0);
 
   return (
     <>
@@ -489,7 +489,14 @@ const ProductDetails = () => {
           font-family: 'DM Serif Display', serif;
           font-size: 2rem;
           color: #2E7D32;
-          margin: 0 0 16px;
+          margin: 0 0 4px;
+        }
+
+        .pd-info-price .unit-label {
+          font-family: 'DM Sans', sans-serif;
+          font-size: 1rem;
+          color: #78909c;
+          font-weight: 400;
         }
 
         .pd-info-description {
@@ -527,6 +534,30 @@ const ProductDetails = () => {
           font-size: 0.92rem;
           color: #263238;
           font-weight: 500;
+        }
+
+        .pd-meta-value .unit {
+          font-size: 0.8rem;
+          color: #78909c;
+          font-weight: 400;
+        }
+
+        .pd-stock-info {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 12px;
+          border-radius: 8px;
+          margin: 0 0 12px 0;
+          font-size: 0.9rem;
+        }
+
+        .pd-stock-info .status-icon {
+          font-size: 1.2rem;
+        }
+
+        .pd-stock-info .status-text {
+          font-weight: 600;
         }
 
         .pd-info-farmer {
@@ -640,12 +671,6 @@ const ProductDetails = () => {
           background: linear-gradient(135deg, #1565C0, #1E88E5);
           color: #fff;
           box-shadow: 0 4px 16px rgba(21, 101, 192, 0.25);
-        }
-
-        .pd-action-btn.cart {
-          background: linear-gradient(135deg, #0277bd, #0288d1);
-          color: #fff;
-          box-shadow: 0 4px 16px rgba(2, 119, 189, 0.25);
         }
 
         .pd-action-btn.purchase {
@@ -787,14 +812,33 @@ const ProductDetails = () => {
                 </div>
 
                 <h1 className="pd-info-name">{product.name}</h1>
-                <div className="pd-info-price">₱{Number(product.price).toFixed(2)}</div>
+                <div className="pd-info-price">
+                  ₱{Number(product.price).toFixed(2)}
+                  <span className="unit-label"> / {unitLabel}</span>
+                </div>
+
+                {/* Stock Status */}
+                <div 
+                  className="pd-stock-info" 
+                  style={{ 
+                    backgroundColor: stockStatus.bg,
+                    color: stockStatus.color
+                  }}
+                >
+                  <span className="status-icon">{stockStatus.icon}</span>
+                  <span className="status-text">
+                    {stockStatus.label}: {product.quantity} {unitLabel} available
+                  </span>
+                </div>
 
                 <p className="pd-info-description">{product.description}</p>
 
                 <div className="pd-info-meta">
                   <div className="pd-meta-item">
-                    <span className="pd-meta-label">Quantity</span>
-                    <span className="pd-meta-value">{product.quantity} {product.unit}</span>
+                    <span className="pd-meta-label">Total Stock</span>
+                    <span className="pd-meta-value">
+                      {product.quantity} <span className="unit">{unitLabel}</span>
+                    </span>
                   </div>
                   <div className="pd-meta-item">
                     <span className="pd-meta-label">Posted</span>
@@ -802,7 +846,7 @@ const ProductDetails = () => {
                   </div>
                   <div className="pd-meta-item">
                     <span className="pd-meta-label">Unit</span>
-                    <span className="pd-meta-value">{product.unit}</span>
+                    <span className="pd-meta-value">{unitFullLabel}</span>
                   </div>
                   <div className="pd-meta-item">
                     <span className="pd-meta-label">Category</span>
@@ -847,16 +891,11 @@ const ProductDetails = () => {
                 {/* ── Actions ── */}
                 <div className="pd-info-actions">
                   <button
-                    className="pd-action-btn cart"
-                    onClick={handleAddToCart}
-                  >
-                    <ShoppingCartIcon size={18} /> Add to Cart
-                  </button>
-                  <button
                     className="pd-action-btn purchase"
                     onClick={handlePurchase}
+                    style={{ flex: 1 }}
                   >
-                    <CreditCardIcon size={18} /> Purchase
+                    <CreditCardIcon size={18} /> Purchase Now
                   </button>
                 </div>
               </div>

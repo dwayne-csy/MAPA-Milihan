@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import UserHeader from '../layouts/Header';
+import { getUnitLabel, getPricePerUnit, getQuantityDisplay } from '../utils/unitHelpers';
 
 // ── Icons ───────────────────────────────────────────────────────────────
 const SearchIcon = ({ size = 20 }) => (
@@ -71,7 +72,7 @@ const Product = () => {
 
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001';
 
-  const categories = ['All', 'Vegetables', 'Fruits', 'Rice', 'Corn', 'Livestock', 'Poultry', 'Dairy', 'Herbs', 'Others'];
+  const categories = ['All', 'Fruits', 'Vegetables', 'Grains', 'Livestock', 'Others'];
 
   useEffect(() => {
     fetchProducts();
@@ -121,6 +122,11 @@ const Product = () => {
         }
       }
     });
+  };
+
+  const handlePurchase = (e, product) => {
+    e.stopPropagation();
+    alert('Purchase functionality coming soon!');
   };
 
   const formatDate = (dateString) => {
@@ -556,6 +562,13 @@ const Product = () => {
           white-space: nowrap;
         }
 
+        .prod-card-price .unit-label {
+          font-family: 'DM Sans', sans-serif;
+          font-size: 0.7rem;
+          color: #78909c;
+          font-weight: 500;
+        }
+
         .prod-card-desc {
           font-size: 0.85rem;
           color: #78909c;
@@ -665,16 +678,11 @@ const Product = () => {
           transform: translateY(-1px);
         }
 
-        .prod-action-btn.cart {
-          background: linear-gradient(135deg, #1565C0, #1E88E5);
-          color: #fff;
-          box-shadow: 0 4px 14px rgba(21, 101, 192, 0.25);
-        }
-
         .prod-action-btn.purchase {
           background: linear-gradient(135deg, #2E7D32, #43A047);
           color: #fff;
           box-shadow: 0 4px 14px rgba(46, 125, 50, 0.25);
+          flex: 1;
         }
 
         /* ── Stats Bar ── */
@@ -810,6 +818,7 @@ const Product = () => {
                 const farmerAvatar = getFarmerAvatar(product);
                 const farmerName = product.farmer?.name || 'Unknown Farmer';
                 const locationDisplay = getLocationDisplay(product);
+                const unitLabel = getUnitLabel(product.unit);
                 
                 return (
                   <div 
@@ -838,7 +847,10 @@ const Product = () => {
                     <div className="prod-card-body">
                       <div className="prod-card-top">
                         <h3 className="prod-card-name">{product.name}</h3>
-                        <span className="prod-card-price">₱{Number(product.price).toFixed(2)}</span>
+                        <span className="prod-card-price">
+                          ₱{Number(product.price).toFixed(2)}
+                          <span className="unit-label"> / {unitLabel}</span>
+                        </span>
                       </div>
                       <p className="prod-card-desc">{product.description}</p>
 
@@ -847,7 +859,7 @@ const Product = () => {
                           <ClockIcon size={14} /> {formatDate(product.createdAt)}
                         </span>
                         <span className="prod-card-meta-item">
-                          <ShoppingCartIcon size={14} /> Qty: {product.quantity} {product.unit}
+                          <ShoppingCartIcon size={14} /> {product.quantity} {unitLabel}
                         </span>
                         <span className="prod-card-meta-item">
                           <span className="prod-card-farmer">
@@ -876,20 +888,8 @@ const Product = () => {
 
                       <div className="prod-card-actions">
                         <button
-                          className="prod-action-btn cart"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            alert('Add to Cart functionality coming soon!');
-                          }}
-                        >
-                          <ShoppingCartIcon size={14} /> Add to Cart
-                        </button>
-                        <button
                           className="prod-action-btn purchase"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            alert('Purchase functionality coming soon!');
-                          }}
+                          onClick={(e) => handlePurchase(e, product)}
                         >
                           Purchase
                         </button>

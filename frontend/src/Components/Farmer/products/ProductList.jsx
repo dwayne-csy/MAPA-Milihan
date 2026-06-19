@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import FarmerHeader from '../../layouts/FarmerHeader';
+import { getUnitLabel, getPricePerUnit, getQuantityDisplay, getStockStatus } from '../../utils/unitHelpers';
 
 // ── Icons ───────────────────────────────────────────────────────────────
 const PlusIcon = ({ size = 20 }) => (
@@ -43,6 +44,13 @@ const EyeIcon = ({ size = 16 }) => (
   </svg>
 );
 
+const RefreshIcon = ({ size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="23 4 23 10 17 10"/>
+    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+  </svg>
+);
+
 // ── Component ───────────────────────────────────────────────────────────
 const ProductList = () => {
   const navigate = useNavigate();
@@ -82,7 +90,7 @@ const ProductList = () => {
   };
 
   const handleDelete = async (productId, e) => {
-    e.stopPropagation(); // Prevent navigation to view product
+    e.stopPropagation();
     if (!window.confirm('Are you sure you want to delete this product?')) return;
 
     try {
@@ -111,7 +119,7 @@ const ProductList = () => {
   };
 
   const handleEditClick = (productId, e) => {
-    e.stopPropagation(); // Prevent navigation to view product
+    e.stopPropagation();
     navigate(`/farmer/update-product/${productId}`);
   };
 
@@ -164,6 +172,10 @@ const ProductList = () => {
         @keyframes pl-fadeup {
           from { opacity: 0; transform: translateY(16px); }
           to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes pl-spin {
+          to { transform: rotate(360deg); }
         }
 
         .pl-root {
@@ -261,6 +273,26 @@ const ProductList = () => {
           transform: translateY(-1px);
         }
 
+        .pl-refresh-btn {
+          padding: 10px 14px;
+          background: #fff;
+          border: 1.5px solid #e0e7e0;
+          border-radius: 10px;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 0.85rem;
+          color: #546e7a;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          transition: all 0.2s;
+        }
+
+        .pl-refresh-btn:hover {
+          border-color: #66BB6A;
+          color: #2E7D32;
+        }
+
         .pl-alert {
           padding: 14px 18px;
           border-radius: 10px;
@@ -341,10 +373,22 @@ const ProductList = () => {
           border-color: #a5d6a7;
         }
 
+        .pl-product-card.low-stock {
+          border-color: #ffcc02;
+          box-shadow: 0 2px 12px rgba(255, 204, 2, 0.15);
+        }
+
+        .pl-product-card.out-of-stock {
+          border-color: #ef5350;
+          box-shadow: 0 2px 12px rgba(239, 83, 80, 0.15);
+          opacity: 0.7;
+        }
+
         .pl-product-image {
           height: 200px;
           background: #e8f5e9;
           overflow: hidden;
+          position: relative;
         }
 
         .pl-product-image img {
@@ -360,6 +404,29 @@ const ProductList = () => {
           height: 100%;
           color: #a5b8a5;
           font-size: 0.9rem;
+        }
+
+        .pl-stock-badge {
+          position: absolute;
+          top: 12px;
+          right: 12px;
+          padding: 4px 12px;
+          border-radius: 12px;
+          font-size: 0.7rem;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          color: #fff;
+          background: #2E7D32;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .pl-stock-badge.low {
+          background: #e65100;
+        }
+
+        .pl-stock-badge.out {
+          background: #c62828;
         }
 
         .pl-product-body {
@@ -425,17 +492,32 @@ const ProductList = () => {
 
         .pl-product-price {
           font-family: 'DM Serif Display', serif;
-          font-size: 1.3rem;
+          font-size: 1.2rem;
           color: #2E7D32;
+        }
+
+        .pl-product-price .unit-label {
+          font-family: 'DM Sans', sans-serif;
+          font-size: 0.7rem;
+          color: #78909c;
+          font-weight: 500;
         }
 
         .pl-product-qty {
           font-size: 0.82rem;
           color: #78909c;
+          text-align: right;
         }
 
         .pl-product-qty strong {
           color: #37474f;
+          font-size: 1.1rem;
+        }
+
+        .pl-product-qty .unit {
+          font-size: 0.7rem;
+          text-transform: uppercase;
+          color: #90a4ae;
         }
 
         .pl-product-footer {
@@ -517,7 +599,7 @@ const ProductList = () => {
           {/* ── Header ── */}
           <div className="pl-header">
             <div className="pl-header-left">
-              <h1>My Products</h1>
+              <h1>📦 My Products</h1>
               <p>{products.length} product{products.length !== 1 ? 's' : ''} listed</p>
             </div>
             <div className="pl-header-actions">
@@ -531,6 +613,9 @@ const ProductList = () => {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
+              <button className="pl-refresh-btn" onClick={fetchProducts}>
+                <RefreshIcon size={16} /> Refresh
+              </button>
               <button
                 className="pl-add-btn"
                 onClick={() => navigate('/farmer/create-product')}
@@ -566,74 +651,89 @@ const ProductList = () => {
             </div>
           ) : (
             <div className="pl-grid">
-              {filteredProducts.map((product) => (
-                <div 
-                  key={product._id} 
-                  className="pl-product-card"
-                  onClick={() => handleProductClick(product._id)}
-                >
-                  {/* Image */}
-                  <div className="pl-product-image">
-                    {product.images && product.images.length > 0 ? (
-                      <img
-                        src={product.images[0].url}
-                        alt={product.name}
-                        onError={(e) => {
-                          e.target.style.display = 'none';
-                          e.target.parentElement.innerHTML = `<div class="no-image">No Image</div>`;
-                        }}
-                      />
-                    ) : (
-                      <div className="no-image">No Image</div>
-                    )}
-                  </div>
-
-                  {/* Body */}
-                  <div className="pl-product-body">
-                    <div className="pl-product-top">
-                      <h3 className="pl-product-name">{product.name}</h3>
-                      <span className={`pl-product-status ${product.isAvailable ? 'available' : 'unavailable'}`}>
-                        {product.isAvailable ? 'Available' : 'Unavailable'}
+              {filteredProducts.map((product) => {
+                const quantity = Number(product.quantity) || 0;
+                const isLowStock = quantity > 0 && quantity < 10;
+                const isOutOfStock = quantity === 0;
+                const unitLabel = getUnitLabel(product.unit);
+                
+                return (
+                  <div 
+                    key={product._id} 
+                    className={`pl-product-card ${isLowStock ? 'low-stock' : ''} ${isOutOfStock ? 'out-of-stock' : ''}`}
+                    onClick={() => handleProductClick(product._id)}
+                  >
+                    {/* Image */}
+                    <div className="pl-product-image">
+                      {product.images && product.images.length > 0 ? (
+                        <img
+                          src={product.images[0].url}
+                          alt={product.name}
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.parentElement.innerHTML = `<div class="no-image">No Image</div>`;
+                          }}
+                        />
+                      ) : (
+                        <div className="no-image">No Image</div>
+                      )}
+                      <span className={`pl-stock-badge ${isOutOfStock ? 'out' : isLowStock ? 'low' : ''}`}>
+                        {isOutOfStock ? 'Out of Stock' : isLowStock ? 'Low Stock' : 'In Stock'}
                       </span>
                     </div>
-                    <p className="pl-product-desc">{product.description}</p>
 
-                    <div className="pl-product-meta">
-                      <span className="pl-product-price">₱{Number(product.price).toFixed(2)}</span>
-                      <span className="pl-product-qty">Qty: <strong>{product.quantity}</strong> {product.unit}</span>
-                    </div>
+                    {/* Body */}
+                    <div className="pl-product-body">
+                      <div className="pl-product-top">
+                        <h3 className="pl-product-name">{product.name}</h3>
+                        <span className={`pl-product-status ${product.isAvailable ? 'available' : 'unavailable'}`}>
+                          {product.isAvailable ? 'Available' : 'Unavailable'}
+                        </span>
+                      </div>
+                      <p className="pl-product-desc">{product.description}</p>
 
-                    <div className="pl-product-footer">
-                      <span>{product.category}</span>
-                      <span>{new Date(product.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-                    </div>
+                      <div className="pl-product-meta">
+                        <span className="pl-product-price">
+                          ₱{Number(product.price).toFixed(2)}
+                          <span className="unit-label"> / {unitLabel}</span>
+                        </span>
+                        <span className="pl-product-qty">
+                          <strong>{quantity}</strong> <span className="unit">{unitLabel}</span>
+                        </span>
+                      </div>
 
-                    <div className="pl-product-actions">
-                      <button
-                        className="pl-action-btn view"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleProductClick(product._id);
-                        }}
-                      >
-                        <EyeIcon size={14} /> View
-                      </button>
-                      <button
-                        className="pl-action-btn edit"
-                        onClick={(e) => handleEditClick(product._id, e)}
-                      >
-                        <EditIcon size={14} /> Edit
-                      </button>
-                      <button
-                        className="pl-action-btn delete"
-                        onClick={(e) => handleDelete(product._id, e)}
-                      >
-                        <TrashIcon size={14} /> Delete
-                      </button>
+                      <div className="pl-product-footer">
+                        <span>{product.category}</span>
+                        <span>{new Date(product.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                      </div>
+
+                      <div className="pl-product-actions">
+                        <button
+                          className="pl-action-btn view"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleProductClick(product._id);
+                          }}
+                        >
+                          <EyeIcon size={14} /> View
+                        </button>
+                        <button
+                          className="pl-action-btn edit"
+                          onClick={(e) => handleEditClick(product._id, e)}
+                        >
+                          <EditIcon size={14} /> Edit
+                        </button>
+                        <button
+                          className="pl-action-btn delete"
+                          onClick={(e) => handleDelete(product._id, e)}
+                        >
+                          <TrashIcon size={14} /> Delete
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

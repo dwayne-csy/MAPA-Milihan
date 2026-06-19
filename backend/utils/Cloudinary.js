@@ -10,7 +10,7 @@ cloudinary.config({
 // Upload to Cloudinary - accepts either:
 // - base64 data URL (starting with 'data:')
 // - local file path (string) or buffer
-const uploadToCloudinary = async (input, folder = 'web') => {
+const uploadToCloudinary = async (input, folder = 'mapa-milihan') => {
   try {
     const uploadOptions = {
       folder: folder,

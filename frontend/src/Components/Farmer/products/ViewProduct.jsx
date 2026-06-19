@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import FarmerHeader from '../../layouts/FarmerHeader';
+import { getUnitLabel, getPricePerUnit, getQuantityDisplay, getStockStatus } from '../../utils/unitHelpers';
 
 // ── Icons ───────────────────────────────────────────────────────────────
 const ArrowLeftIcon = ({ size = 20 }) => (
@@ -38,13 +39,6 @@ const ShoppingCartIcon = ({ size = 18 }) => (
   </svg>
 );
 
-const ClockIcon = ({ size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10"/>
-    <polyline points="12 6 12 12 16 14"/>
-  </svg>
-);
-
 const CheckIcon = ({ size = 16 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M20 6 9 17l-5-5"/>
@@ -62,13 +56,6 @@ const AlertTriangleIcon = ({ size = 24 }) => (
     <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
     <line x1="12" y1="9" x2="12" y2="13"/>
     <line x1="12" y1="17" x2="12.01" y2="17"/>
-  </svg>
-);
-
-const UserIcon = ({ size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-    <circle cx="12" cy="7" r="4"/>
   </svg>
 );
 
@@ -178,8 +165,6 @@ const ViewProduct = () => {
     }
   };
 
-  const getInitial = (name) => name?.charAt(0)?.toUpperCase() || 'F';
-
   // ── Loading State ──
   if (loading) {
     return (
@@ -269,6 +254,9 @@ const ViewProduct = () => {
     );
   }
 
+  const unitLabel = getUnitLabel(product.unit);
+  const stockStatus = getStockStatus(Number(product.quantity) || 0);
+
   return (
     <>
       <FarmerHeader />
@@ -298,7 +286,6 @@ const ViewProduct = () => {
           padding: 32px 20px 60px;
         }
 
-        /* ── Header Actions ── */
         .vp-header-actions {
           display: flex;
           justify-content: space-between;
@@ -363,7 +350,6 @@ const ViewProduct = () => {
           color: #fff;
         }
 
-        /* ── Product Card ── */
         .vp-card {
           background: #fff;
           border-radius: 16px;
@@ -379,7 +365,6 @@ const ViewProduct = () => {
           gap: 0;
         }
 
-        /* ── Image Gallery ── */
         .vp-gallery {
           background: #fafffa;
           position: relative;
@@ -464,7 +449,6 @@ const ViewProduct = () => {
           transform: scale(1.3);
         }
 
-        /* ── Product Info ── */
         .vp-info {
           padding: 32px 36px;
           display: flex;
@@ -496,7 +480,14 @@ const ViewProduct = () => {
           font-family: 'DM Serif Display', serif;
           font-size: 2rem;
           color: #2E7D32;
-          margin: 0 0 16px;
+          margin: 0 0 4px;
+        }
+
+        .vp-info-price .unit-label {
+          font-family: 'DM Sans', sans-serif;
+          font-size: 1rem;
+          color: #78909c;
+          font-weight: 400;
         }
 
         .vp-status-badge {
@@ -558,6 +549,12 @@ const ViewProduct = () => {
           font-weight: 500;
         }
 
+        .vp-meta-value .unit {
+          font-size: 0.8rem;
+          color: #78909c;
+          font-weight: 400;
+        }
+
         .vp-info-location {
           display: flex;
           align-items: center;
@@ -599,7 +596,24 @@ const ViewProduct = () => {
           opacity: 0.85;
         }
 
-        /* ── Delete Modal ── */
+        .vp-stock-info {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 12px;
+          border-radius: 8px;
+          margin: 8px 0 12px;
+          font-size: 0.9rem;
+        }
+
+        .vp-stock-info .status-icon {
+          font-size: 1.2rem;
+        }
+
+        .vp-stock-info .status-text {
+          font-weight: 600;
+        }
+
         .vp-modal-overlay {
           position: fixed;
           top: 0;
@@ -812,14 +826,33 @@ const ViewProduct = () => {
                 </div>
 
                 <h1 className="vp-info-name">{product.name}</h1>
-                <div className="vp-info-price">₱{Number(product.price).toFixed(2)}</div>
+                <div className="vp-info-price">
+                  ₱{Number(product.price).toFixed(2)}
+                  <span className="unit-label"> / {unitLabel}</span>
+                </div>
+
+                {/* Stock Status */}
+                <div 
+                  className="vp-stock-info" 
+                  style={{ 
+                    backgroundColor: stockStatus.bg,
+                    color: stockStatus.color
+                  }}
+                >
+                  <span className="status-icon">{stockStatus.icon}</span>
+                  <span className="status-text">
+                    {stockStatus.label}: {product.quantity} {unitLabel} available
+                  </span>
+                </div>
 
                 <p className="vp-info-description">{product.description}</p>
 
                 <div className="vp-info-meta">
                   <div className="vp-meta-item">
-                    <span className="vp-meta-label">Quantity</span>
-                    <span className="vp-meta-value">{product.quantity} {product.unit}</span>
+                    <span className="vp-meta-label">Total Stock</span>
+                    <span className="vp-meta-value">
+                      {product.quantity} <span className="unit">{unitLabel}</span>
+                    </span>
                   </div>
                   <div className="vp-meta-item">
                     <span className="vp-meta-label">Posted</span>
@@ -827,7 +860,7 @@ const ViewProduct = () => {
                   </div>
                   <div className="vp-meta-item">
                     <span className="vp-meta-label">Unit</span>
-                    <span className="vp-meta-value">{product.unit}</span>
+                    <span className="vp-meta-value">{unitLabel}</span>
                   </div>
                   <div className="vp-meta-item">
                     <span className="vp-meta-label">Category</span>

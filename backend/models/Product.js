@@ -25,12 +25,12 @@ const productSchema = new mongoose.Schema({
     category: {
         type: String,
         required: [true, 'Please select a category'],
-        enum: ['Vegetables', 'Fruits', 'Rice', 'Corn', 'Livestock', 'Poultry', 'Dairy', 'Herbs', 'Others']
+        enum: ['Fruits', 'Vegetables', 'Grains', 'Livestock', 'Others']
     },
     unit: {
         type: String,
         required: [true, 'Please select a unit'],
-        enum: ['kg', 'gram', 'piece', 'bundle', 'box', 'sack', 'dozen', 'liter']
+        enum: ['kg', 'tray', 'sack', 'pc', 'L']
     },
     images: [{
         public_id: {
