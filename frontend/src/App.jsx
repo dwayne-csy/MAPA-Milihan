@@ -5,14 +5,20 @@ import ProtectedRoute from './Components/ProtectedRoute';
 import Login from "./Components/Auth/Login";
 import Register from "./Components/Auth/Register";
 import Home from "./Components/User/Home";
-import AboutUs from "./Components/User/AboutUs";
-import Contacts from "./Components/User/Contacts";
 import EditProfile from "./Components/User/EditProfile";
 import AdminDashboard from "./Components/Admin/Dashboard";
 import ForgotPassword from "./Components/Auth/ForgotPassword";
 import ResetPassword from "./Components/Auth/ResetPassword";
 import ChangePassword from "./Components/User/ChangePassword";
 import Dashboard from "./Components/Farmer/Dashboard";
+import ProductList from "./Components/Farmer/products/ProductList";
+import CreateProduct from "./Components/Farmer/products/CreateProduct";
+import UpdateProduct from "./Components/Farmer/products/UpdateProduct";
+import FarmerEditProfile from "./Components/Farmer/FarmerEditProfile";
+import Product from "./Components/User/Product";
+import ProductDetails from "./Components/User/ProductDetails";
+import ViewProduct from "./Components/Farmer/products/ViewProduct";
+import Maps from "./Components/User/Maps";
 
 const App = () => {
   const token = isAuthenticated();
@@ -39,13 +45,19 @@ const App = () => {
 
         {/* User Protected Routes */}
         <Route path="/home" element={<ProtectedRoute requiredRole="user"><Home /></ProtectedRoute>} />
-        <Route path="/about" element={<ProtectedRoute requiredRole="user"><AboutUs /></ProtectedRoute>} />
-        <Route path="/contact" element={<ProtectedRoute requiredRole="user"><Contacts /></ProtectedRoute>} />
         <Route path="/edit-profile" element={<ProtectedRoute requiredRole="user"><EditProfile /></ProtectedRoute>} />
         <Route path="/change-password" element={<ProtectedRoute requiredRole="user"><ChangePassword /></ProtectedRoute>} />
-
+        <Route path="/product" element={<ProtectedRoute requiredRole="user"><Product /></ProtectedRoute>} />
+        <Route path="/product/:id" element={<ProtectedRoute requiredRole="user"><ProductDetails /></ProtectedRoute>} />
+        <Route path="/maps" element={<ProtectedRoute requiredRole="user"><Maps /></ProtectedRoute>} />
+        
         {/* Farmer Protected Routes */}
         <Route path="/farmer/dashboard" element={<ProtectedRoute requiredRole="farmer"><Dashboard /></ProtectedRoute>} />
+        <Route path="/farmer/productlist" element={<ProtectedRoute requiredRole="farmer"><ProductList /></ProtectedRoute>} />
+        <Route path="/farmer/create-product" element={<ProtectedRoute requiredRole="farmer"><CreateProduct /></ProtectedRoute>} />
+        <Route path="/farmer/update-product/:id" element={<ProtectedRoute requiredRole="farmer"><UpdateProduct /></ProtectedRoute>} />
+        <Route path="/farmer/edit-profile" element={<ProtectedRoute requiredRole="farmer"><FarmerEditProfile /></ProtectedRoute>} />
+        <Route path="/farmer/view-product/:id" element={<ProtectedRoute requiredRole="farmer"><ViewProduct /></ProtectedRoute>} />
 
         {/* Admin Protected Routes */}
         <Route path="/admin/dashboard" element={<ProtectedRoute requiredRole="admin"><AdminDashboard /></ProtectedRoute>} />

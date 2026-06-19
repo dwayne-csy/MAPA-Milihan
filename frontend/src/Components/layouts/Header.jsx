@@ -65,9 +65,9 @@ const Header = () => {
 
   const navigationItems = [
     { label: 'Home', path: '/home', icon: HomeIcon },
-    { label: 'Products', path: '/products', icon: ShoppingBagIcon },
+    { label: 'Products', path: '/product', icon: ShoppingBagIcon },
     { label: 'Forums', path: '/forums', icon: ForumIcon },
-    { label: 'Mapping', path: '/mapping', icon: MapIcon },
+    { label: 'Mapping', path: '/maps', icon: MapIcon },
   ];
 
   const handleLogout = () => {

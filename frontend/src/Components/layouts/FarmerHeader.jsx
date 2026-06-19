@@ -59,7 +59,7 @@ const FarmerHeader = () => {
 
   const navigationItems = [
     { label: 'Home', path: '/farmer/dashboard', icon: HomeIcon },
-    { label: 'Products', path: '/farmer/products', icon: ShoppingBagIcon },
+    { label: 'Products', path: '/farmer/productlist', icon: ShoppingBagIcon },
     { label: 'Forums', path: '/farmer/forums', icon: ForumIcon },
   ];
 
