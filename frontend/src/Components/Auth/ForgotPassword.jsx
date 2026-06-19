@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import logo from '../logo/logo.png';
 
 const ForgotPassword = () => {
   const navigate = useNavigate();
@@ -54,31 +55,41 @@ const ForgotPassword = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-2xl shadow-xl">
-        {/* Header */}
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Forgot Password?
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
+    <div className="full-bleed w-full min-h-screen bg-white flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="w-full max-w-md space-y-6">
+        {/* Logo and Header */}
+        <div className="text-center">
+          <div className="flex justify-center mb-4">
+            <img 
+              src={logo} 
+              alt="MAPA-Milihan Logo" 
+              className="h-20 w-auto"
+            />
+          </div>
+          <h1 className="text-3xl font-bold text-gray-900">
+            MAPA-Milihan
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Forgot your password?
+          </p>
+          <p className="mt-2 text-sm text-gray-600">
             Enter your email address and we'll send you a link to reset your password.
           </p>
         </div>
 
         {/* Message Alerts */}
         {message.text && (
-          <div className={`p-4 rounded-lg ${
+          <div className={`p-4 rounded-lg text-sm ${
             message.type === 'success' 
-              ? 'bg-green-50 text-green-700 border border-green-400' 
-              : 'bg-red-50 text-red-700 border border-red-400'
+              ? 'bg-green-50 border border-green-200 text-green-700' 
+              : 'bg-red-50 border border-red-200 text-red-600'
           }`}>
             {message.text}
           </div>
         )}
 
         {/* Form */}
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        <form className="space-y-4" onSubmit={handleSubmit}>
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700">
               Email Address
@@ -91,7 +102,7 @@ const ForgotPassword = () => {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
               placeholder="you@example.com"
             />
           </div>
@@ -99,7 +110,7 @@ const ForgotPassword = () => {
           <button
             type="submit"
             disabled={loading}
-            className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (
               <span className="flex items-center">
@@ -116,14 +127,14 @@ const ForgotPassword = () => {
         </form>
 
         {/* Back to Login Link */}
-        <div className="text-center mt-4">
-          <Link to="/login" className="text-sm text-blue-600 hover:text-blue-500">
-            ← Back to Login
+        <div className="text-center">
+          <Link to="/login" className="text-sm text-emerald-600 hover:text-emerald-700 font-medium">
+            ← Back to Sign In
           </Link>
         </div>
 
         {/* Info Box */}
-        <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+        <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
           <p className="text-xs text-gray-500 text-center">
             We'll send a password reset link to your email address. 
             The link will expire in 30 minutes for security reasons.

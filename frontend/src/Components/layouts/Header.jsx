@@ -1,21 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import EditIcon from '@mui/icons-material/Edit';
 import LogoutIcon from '@mui/icons-material/Logout';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import HomeIcon from '@mui/icons-material/Home';
-import ShoppingBagIcon from '@mui/icons-material/ShoppingBag';
-import ForumIcon from '@mui/icons-material/Forum';
-import MapIcon from '@mui/icons-material/Map';
-import MenuIcon from '@mui/icons-material/Menu';
-import CloseIcon from '@mui/icons-material/Close';
+import logo from '../logo/logo.png'; // Correct path for Components/layouts/Header.jsx
 
 const Header = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [logoError, setLogoError] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -64,10 +59,10 @@ const Header = () => {
   const toggleMobileMenu = () => setMobileMenuOpen(!mobileMenuOpen);
 
   const navigationItems = [
-    { label: 'Home', path: '/home', icon: HomeIcon },
-    { label: 'Products', path: '/product', icon: ShoppingBagIcon },
-    { label: 'Forums', path: '/forums', icon: ForumIcon },
-    { label: 'Mapping', path: '/maps', icon: MapIcon },
+    { label: 'Home', path: '/home' },
+    { label: 'Products', path: '/product' },
+    { label: 'Forums', path: '/forums' },
+    { label: 'Mapping', path: '/maps' },
   ];
 
   const handleLogout = () => {
@@ -136,7 +131,7 @@ const Header = () => {
         }
 
         .user-header {
-          background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+          background: linear-gradient(135deg, #059669 0%, #047857 100%);
           box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
           position: sticky;
           top: 0;
@@ -172,15 +167,14 @@ const Header = () => {
           text-shadow: 0 2px 10px rgba(255, 255, 255, 0.3);
         }
 
-        .system-title .title-icon {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: #93c5fd;
+        .system-title .title-logo {
+          height: 40px;
+          width: auto;
+          border-radius: 8px;
         }
 
         .system-title .title-text {
-          background: linear-gradient(to right, #ffffff, #93c5fd);
+          background: linear-gradient(to right, #ffffff, #a7f3d0);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
@@ -195,9 +189,6 @@ const Header = () => {
         }
 
         .nav-link {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
           color: rgba(255, 255, 255, 0.85);
           font-weight: 500;
           cursor: pointer;
@@ -206,13 +197,6 @@ const Header = () => {
           transition: all 0.3s ease;
           font-size: 0.95rem;
           position: relative;
-        }
-
-        .nav-link .nav-icon {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 1.2rem;
         }
 
         .nav-link:hover {
@@ -389,6 +373,7 @@ const Header = () => {
           border-radius: 8px;
           transition: all 0.3s ease;
           background: rgba(255, 255, 255, 0.08);
+          font-size: 1.8rem;
         }
 
         .mobile-menu-btn:hover {
@@ -399,7 +384,7 @@ const Header = () => {
         .mobile-nav {
           display: none;
           flex-direction: column;
-          background: rgba(30, 58, 138, 0.98);
+          background: rgba(4, 120, 87, 0.98);
           backdrop-filter: blur(10px);
           padding: 0.5rem 0;
           border-top: 1px solid rgba(255, 255, 255, 0.08);
@@ -414,9 +399,6 @@ const Header = () => {
         }
 
         .mobile-nav-link {
-          display: flex;
-          align-items: center;
-          gap: 0.75rem;
           color: rgba(255, 255, 255, 0.85);
           padding: 14px 2rem;
           font-weight: 500;
@@ -436,13 +418,6 @@ const Header = () => {
           font-weight: 600;
         }
 
-        .mobile-nav-link .nav-icon {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 1.3rem;
-        }
-
         @media (max-width: 1024px) {
           .nav-links {
             gap: 0.25rem;
@@ -452,10 +427,6 @@ const Header = () => {
           .nav-link {
             padding: 6px 12px;
             font-size: 0.85rem;
-          }
-
-          .nav-link .nav-label {
-            display: none;
           }
         }
 
@@ -473,8 +444,8 @@ const Header = () => {
             font-size: 1.2rem;
           }
 
-          .system-title .title-icon {
-            font-size: 1.4rem;
+          .system-title .title-logo {
+            height: 32px;
           }
 
           .user-info {
@@ -507,8 +478,8 @@ const Header = () => {
             font-size: 1rem;
           }
 
-          .system-title .title-icon {
-            font-size: 1.2rem;
+          .system-title .title-logo {
+            height: 28px;
           }
 
           .header-container {
@@ -525,31 +496,32 @@ const Header = () => {
 
       <header className="user-header">
         <div className="header-container">
-          {/* System Title */}
+          {/* System Title with Logo */}
           <div className="system-title" onClick={() => navigate('/home')}>
-            <span className="title-icon">
-              <MapIcon sx={{ fontSize: '1.8rem' }} />
-            </span>
+            {!logoError ? (
+              <img 
+                src={logo} 
+                alt="MAPA-Milihan Logo" 
+                className="title-logo"
+                onError={() => setLogoError(true)}
+              />
+            ) : (
+              <span style={{ fontSize: '1.8rem', color: 'white' }}>📍</span>
+            )}
             <span className="title-text">MAPA-Milihan</span>
           </div>
 
           {/* Navigation Links - Desktop */}
           <nav className="nav-links">
-            {navigationItems.map((item, i) => {
-              const IconComponent = item.icon;
-              return (
-                <div
-                  key={i}
-                  className={`nav-link ${isNavActive(item.path) ? 'active' : ''}`}
-                  onClick={() => navigate(item.path)}
-                >
-                  <span className="nav-icon">
-                    <IconComponent sx={{ fontSize: '1.2rem' }} />
-                  </span>
-                  <span className="nav-label">{item.label}</span>
-                </div>
-              );
-            })}
+            {navigationItems.map((item, i) => (
+              <div
+                key={i}
+                className={`nav-link ${isNavActive(item.path) ? 'active' : ''}`}
+                onClick={() => navigate(item.path)}
+              >
+                {item.label}
+              </div>
+            ))}
           </nav>
 
           {/* User Profile Section */}
@@ -599,35 +571,25 @@ const Header = () => {
               className="mobile-menu-btn" 
               onClick={toggleMobileMenu}
             >
-              {mobileMenuOpen ? (
-                <CloseIcon sx={{ fontSize: '1.8rem' }} />
-              ) : (
-                <MenuIcon sx={{ fontSize: '1.8rem' }} />
-              )}
+              {mobileMenuOpen ? '✕' : '☰'}
             </button>
           </div>
         </div>
 
         {/* Mobile Navigation */}
         <div className={`mobile-nav ${mobileMenuOpen ? 'open' : ''}`}>
-          {navigationItems.map((item, i) => {
-            const IconComponent = item.icon;
-            return (
-              <div
-                key={i}
-                className={`mobile-nav-link ${isNavActive(item.path) ? 'active' : ''}`}
-                onClick={() => {
-                  navigate(item.path);
-                  setMobileMenuOpen(false);
-                }}
-              >
-                <span className="nav-icon">
-                  <IconComponent sx={{ fontSize: '1.3rem' }} />
-                </span>
-                <span>{item.label}</span>
-              </div>
-            );
-          })}
+          {navigationItems.map((item, i) => (
+            <div
+              key={i}
+              className={`mobile-nav-link ${isNavActive(item.path) ? 'active' : ''}`}
+              onClick={() => {
+                navigate(item.path);
+                setMobileMenuOpen(false);
+              }}
+            >
+              {item.label}
+            </div>
+          ))}
         </div>
       </header>
     </>

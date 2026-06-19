@@ -19,11 +19,14 @@ app.use(express.urlencoded({limit: "50mb", extended: true }));
 // ========== ROUTES ==========
 const userRoutes = require('./routes/User');
 const productRoutes = require('./routes/Product');
+const groqChatbotRoutes = require('./routes/groqchatbot');
 
 
 // Use routes
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/products', productRoutes);
+app.use('/api/v1/groqchatbot', groqChatbotRoutes);
+
 
 
 // ========== HEALTH CHECK ENDPOINT ==========
