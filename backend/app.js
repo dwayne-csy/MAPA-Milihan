@@ -1,33 +1,32 @@
 const express = require('express');
 const app = express();
-const cors = require('cors')
+const cors = require('cors');
 
 // ========== CORS CONFIGURATION ==========
 app.use(cors({
-    origin: 'http://localhost:5173', // Your frontend URL
+    origin: 'http://localhost:5173',
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // ========== OTHER MIDDLEWARE ==========
-app.use(express.json({limit:'50mb'}));
-app.use(express.urlencoded({limit: "50mb", extended: true }));
-
-
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
 // ========== ROUTES ==========
 const userRoutes = require('./routes/User');
 const productRoutes = require('./routes/Product');
 const groqChatbotRoutes = require('./routes/groqchatbot');
-
+const forumRoutes = require('./routes/Forum');
+const uploadRoutes = require('./routes/uploadRoutes'); // <-- ADD THIS
 
 // Use routes
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/products', productRoutes);
 app.use('/api/v1/groqchatbot', groqChatbotRoutes);
-
-
+app.use('/api/forums', forumRoutes);
+app.use('/api/v1/upload', uploadRoutes); // <-- ADD THIS
 
 // ========== HEALTH CHECK ENDPOINT ==========
 app.get('/api/v1/health', (req, res) => {
@@ -37,7 +36,5 @@ app.get('/api/v1/health', (req, res) => {
         timestamp: new Date().toISOString()
     });
 });
-
-
 
 module.exports = app;

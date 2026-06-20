@@ -19,6 +19,7 @@ import Product from "./Components/User/Product";
 import ProductDetails from "./Components/User/ProductDetails";
 import ViewProduct from "./Components/Farmer/products/ViewProduct";
 import Maps from "./Components/User/Maps";
+import Forum from "./Components/User/Forum";
 
 const App = () => {
   const token = isAuthenticated();
@@ -50,6 +51,7 @@ const App = () => {
         <Route path="/product" element={<ProtectedRoute requiredRole="user"><Product /></ProtectedRoute>} />
         <Route path="/product/:id" element={<ProtectedRoute requiredRole="user"><ProductDetails /></ProtectedRoute>} />
         <Route path="/maps" element={<ProtectedRoute requiredRole="user"><Maps /></ProtectedRoute>} />
+        <Route path="/forum" element={<ProtectedRoute requiredRole="user"><Forum /></ProtectedRoute>} />
         
         {/* Farmer Protected Routes */}
         <Route path="/farmer/dashboard" element={<ProtectedRoute requiredRole="farmer"><Dashboard /></ProtectedRoute>} />

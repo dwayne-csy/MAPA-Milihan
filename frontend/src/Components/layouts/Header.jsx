@@ -61,7 +61,7 @@ const Header = () => {
   const navigationItems = [
     { label: 'Home', path: '/home' },
     { label: 'Products', path: '/product' },
-    { label: 'Forums', path: '/forums' },
+    { label: 'Forums', path: '/forum' },
     { label: 'Mapping', path: '/maps' },
   ];
 
