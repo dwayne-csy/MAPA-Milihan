@@ -1074,10 +1074,10 @@ const FarmerForum = () => {
               </button>
             </div>
             
-            {/* Reply input for this comment */}
+            {/* Reply input for this comment - INLINE STYLE */}
             {showReplyInput && showReplyInput.commentId === comment._id && showReplyInput.postId === post._id && (
-              <div className="mt-3 pt-2 border-t border-gray-200">
-                <div className="flex gap-2">
+              <div className="mt-3 pt-2">
+                <div className="flex items-center gap-2">
                   <div className="w-7 h-7 rounded-full flex items-center justify-center text-white font-semibold text-xs flex-shrink-0 overflow-hidden">
                     {getUserAvatarUrl(user) ? (
                       <img 
@@ -1099,13 +1099,13 @@ const FarmerForum = () => {
                       </div>
                     )}
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 flex items-center gap-2">
                     <input
                       type="text"
                       placeholder={`Reply to ${comment.author.name}...`}
                       value={replyContent}
                       onChange={(e) => setReplyContent(e.target.value)}
-                      className="w-full px-3 py-1.5 border border-gray-300 rounded-full focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
+                      className="flex-1 px-3 py-1.5 border border-gray-300 rounded-full focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
                       autoFocus
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
@@ -1124,65 +1124,63 @@ const FarmerForum = () => {
                         }
                       }}
                     />
-                    <div className="mt-2">
-                      <input
-                        ref={replyFileInputRef}
-                        type="file"
-                        accept="image/*,video/*"
-                        multiple
-                        onChange={handleReplyFileSelect}
-                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer"
-                      />
-                    </div>
-                    {replyMediaFiles.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {replyMediaFiles.map((media, index) => (
-                          <div key={index} className="relative w-16 h-16 border border-gray-200 rounded-lg overflow-hidden">
-                            {media.type.startsWith('video/') ? (
-                              <video className="w-full h-full object-cover bg-black">
-                                <source src={URL.createObjectURL(media)} />
-                              </video>
-                            ) : (
-                              <img src={URL.createObjectURL(media)} alt="Preview" className="w-full h-full object-cover" />
-                            )}
-                            <button 
-                              type="button"
-                              onClick={() => removeReplyMedia(index)}
-                              className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <div className="mt-2 flex gap-2">
-                      <button 
-                        onClick={() => handleAddReply(
-                          post._id,
-                          comment._id,
-                          comment.author.userId,
-                          comment.author.name
-                        )}
-                        className="px-4 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full font-medium text-sm transition-colors"
-                      >
-                        Reply
-                      </button>
-                      <button 
-                        onClick={() => {
-                          setShowReplyInput(null);
-                          setReplyContent('');
-                          setReplyMediaFiles([]);
-                          if (replyFileInputRef.current) {
-                            replyFileInputRef.current.value = '';
-                          }
-                        }}
-                        className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded-full text-sm transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    </div>
+                    <button 
+                      onClick={() => handleAddReply(
+                        post._id,
+                        comment._id,
+                        comment.author.userId,
+                        comment.author.name
+                      )}
+                      className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full font-medium text-sm transition-colors whitespace-nowrap"
+                    >
+                      Reply
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setShowReplyInput(null);
+                        setReplyContent('');
+                        setReplyMediaFiles([]);
+                        if (replyFileInputRef.current) {
+                          replyFileInputRef.current.value = '';
+                        }
+                      }}
+                      className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 rounded-full text-sm transition-colors whitespace-nowrap"
+                    >
+                      Cancel
+                    </button>
                   </div>
+                </div>
+                {replyMediaFiles.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2 ml-9">
+                    {replyMediaFiles.map((media, index) => (
+                      <div key={index} className="relative w-16 h-16 border border-gray-200 rounded-lg overflow-hidden">
+                        {media.type.startsWith('video/') ? (
+                          <video className="w-full h-full object-cover bg-black">
+                            <source src={URL.createObjectURL(media)} />
+                          </video>
+                        ) : (
+                          <img src={URL.createObjectURL(media)} alt="Preview" className="w-full h-full object-cover" />
+                        )}
+                        <button 
+                          type="button"
+                          onClick={() => removeReplyMedia(index)}
+                          className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-1 ml-9">
+                  <input
+                    ref={replyFileInputRef}
+                    type="file"
+                    accept="image/*,video/*"
+                    multiple
+                    onChange={handleReplyFileSelect}
+                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer"
+                  />
                 </div>
               </div>
             )}
@@ -1494,8 +1492,8 @@ const FarmerForum = () => {
                       <p className="text-gray-500 text-sm">No comments yet. Be the first to comment!</p>
                     )}
                     
-                    {/* Add new comment */}
-                    <div className="mt-4 flex gap-3">
+                    {/* Add new comment - INLINE STYLE */}
+                    <div className="mt-4 flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-xs flex-shrink-0 overflow-hidden">
                         {getUserAvatarUrl(user) ? (
                           <img 
@@ -1517,13 +1515,13 @@ const FarmerForum = () => {
                           </div>
                         )}
                       </div>
-                      <div className="flex-1 space-y-2">
+                      <div className="flex-1 flex items-center gap-2">
                         <input
                           type="text"
                           placeholder="Write a comment..."
                           value={commentContent}
                           onChange={(e) => setCommentContent(e.target.value)}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-full focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
+                          className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' && !e.shiftKey) {
                               e.preventDefault();
@@ -1531,45 +1529,45 @@ const FarmerForum = () => {
                             }
                           }}
                         />
-                        <div>
-                          <input
-                            ref={commentFileInputRef}
-                            type="file"
-                            accept="image/*,video/*"
-                            multiple
-                            onChange={handleCommentFileSelect}
-                            className="block w-full text-sm text-gray-500 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer"
-                          />
-                        </div>
-                        {commentMediaFiles.length > 0 && (
-                          <div className="flex flex-wrap gap-2">
-                            {commentMediaFiles.map((media, index) => (
-                              <div key={index} className="relative w-16 h-16 border border-gray-200 rounded-lg overflow-hidden">
-                                {media.type.startsWith('video/') ? (
-                                  <video className="w-full h-full object-cover bg-black">
-                                    <source src={URL.createObjectURL(media)} />
-                                  </video>
-                                ) : (
-                                  <img src={URL.createObjectURL(media)} alt="Preview" className="w-full h-full object-cover" />
-                                )}
-                                <button 
-                                  type="button"
-                                  onClick={() => removeCommentMedia(index)}
-                                  className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
-                                >
-                                  ×
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
                         <button 
                           onClick={() => handleAddComment(post._id)}
-                          className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full font-medium text-sm transition-colors"
+                          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full font-medium text-sm transition-colors whitespace-nowrap"
                         >
                           Comment
                         </button>
                       </div>
+                    </div>
+                    {commentMediaFiles.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2 ml-11">
+                        {commentMediaFiles.map((media, index) => (
+                          <div key={index} className="relative w-16 h-16 border border-gray-200 rounded-lg overflow-hidden">
+                            {media.type.startsWith('video/') ? (
+                              <video className="w-full h-full object-cover bg-black">
+                                <source src={URL.createObjectURL(media)} />
+                              </video>
+                            ) : (
+                              <img src={URL.createObjectURL(media)} alt="Preview" className="w-full h-full object-cover" />
+                            )}
+                            <button 
+                              type="button"
+                              onClick={() => removeCommentMedia(index)}
+                              className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="mt-1 ml-11">
+                      <input
+                        ref={commentFileInputRef}
+                        type="file"
+                        accept="image/*,video/*"
+                        multiple
+                        onChange={handleCommentFileSelect}
+                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer"
+                      />
                     </div>
                   </div>
                 )}
