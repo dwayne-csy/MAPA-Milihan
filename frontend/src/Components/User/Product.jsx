@@ -60,6 +60,37 @@ const RefreshIcon = ({ size = 18 }) => (
   </svg>
 );
 
+const PlayIcon = ({ size = 32 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+    <circle cx="12" cy="12" r="12" fill="rgba(0,0,0,0.5)"/>
+    <polygon points="10,8 16,12 10,16" fill="white"/>
+  </svg>
+);
+
+const VideoIcon = ({ size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="2" width="20" height="20" rx="2.18"/>
+    <line x1="8" y1="2" x2="8" y2="22"/>
+    <line x1="16" y1="2" x2="16" y2="22"/>
+    <line x1="2" y1="8" x2="22" y2="8"/>
+    <line x1="2" y1="16" x2="22" y2="16"/>
+    <polygon points="10 10 14 12 10 14 10 10"/>
+  </svg>
+);
+
+// ── Helper: Check if URL is video ─────────────────────────────────────
+const isVideoUrl = (url) => {
+  if (!url) return false;
+  const videoExtensions = ['.mp4', '.webm', '.mov', '.avi', '.mpeg', '.ogg', '.3gpp', '.flv', '.wmv'];
+  const videoMimeTypes = ['video/mp4', 'video/webm', 'video/quicktime'];
+  
+  if (videoExtensions.some(ext => url.toLowerCase().includes(ext))) return true;
+  if (videoMimeTypes.some(mime => url.toLowerCase().includes(mime))) return true;
+  if (url.includes('/video/upload/')) return true;
+  
+  return false;
+};
+
 // ── Component ───────────────────────────────────────────────────────────
 const Product = () => {
   const navigate = useNavigate();
@@ -142,6 +173,13 @@ const Product = () => {
     return null;
   };
 
+  const getFirstMedia = (product) => {
+    if (product.images && product.images.length > 0) {
+      return product.images[0];
+    }
+    return null;
+  };
+
   const getFarmerAvatar = (product) => {
     if (product.farmerAvatar) {
       return product.farmerAvatar.startsWith('http') ? product.farmerAvatar : `${API_BASE_URL}${product.farmerAvatar}`;
@@ -179,6 +217,49 @@ const Product = () => {
     const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
+
+  // ── Media Thumbnail Component ──────────────────────────────────────
+  const MediaThumbnail = ({ product }) => {
+    const media = getFirstMedia(product);
+    
+    if (!media || !media.url) {
+      return <div className="prod-no-image">No Media</div>;
+    }
+
+    const isVideo = isVideoUrl(media.url);
+    const mediaUrl = media.url.startsWith('http') ? media.url : `${API_BASE_URL}${media.url}`;
+
+    if (isVideo) {
+      return (
+        <div className="prod-video-thumbnail">
+          <video
+            src={mediaUrl}
+            muted
+            playsInline
+            onError={(e) => {
+              e.target.style.display = 'none';
+              e.target.parentElement.innerHTML = `<div class="prod-no-image">Video Error</div>`;
+            }}
+          />
+          <div className="prod-video-overlay">
+            <PlayIcon size={40} />
+            <span className="prod-video-badge">VIDEO</span>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <img
+        src={mediaUrl}
+        alt={product.name}
+        onError={(e) => {
+          e.target.style.display = 'none';
+          e.target.parentElement.innerHTML = `<div class="prod-no-image">No Image</div>`;
+        }}
+      />
+    );
+  };
 
   // ── Loading State ──
   if (loading) {
@@ -490,7 +571,69 @@ const Product = () => {
           object-fit: cover;
         }
 
-        .prod-card-image .no-image {
+        /* ── Video Thumbnail ── */
+        .prod-video-thumbnail {
+          width: 100%;
+          height: 100%;
+          position: relative;
+          background: #1a1a2e;
+        }
+
+        .prod-video-thumbnail video {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+
+        .prod-video-overlay {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: rgba(0, 0, 0, 0.2);
+          transition: background 0.3s;
+        }
+
+        .prod-card:hover .prod-video-overlay {
+          background: rgba(0, 0, 0, 0.1);
+        }
+
+        .prod-video-overlay svg {
+          opacity: 0.9;
+          transition: transform 0.3s;
+        }
+
+        .prod-card:hover .prod-video-overlay svg {
+          transform: scale(1.1);
+        }
+
+        .prod-video-badge {
+          position: absolute;
+          top: 12px;
+          left: 12px;
+          background: rgba(0, 0, 0, 0.7);
+          color: #fff;
+          font-size: 0.6rem;
+          font-weight: 700;
+          padding: 2px 10px;
+          border-radius: 10px;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+        }
+
+        .prod-video-badge svg {
+          width: 12px;
+          height: 12px;
+        }
+
+        .prod-no-image {
           display: flex;
           align-items: center;
           justify-content: center;
@@ -502,7 +645,7 @@ const Product = () => {
         .prod-card-image .category-badge {
           position: absolute;
           top: 12px;
-          left: 12px;
+          right: 12px;
           background: rgba(0, 0, 0, 0.7);
           color: #fff;
           padding: 4px 12px;
@@ -511,6 +654,24 @@ const Product = () => {
           font-weight: 600;
           text-transform: uppercase;
           letter-spacing: 0.05em;
+          z-index: 2;
+        }
+
+        .prod-media-count {
+          position: absolute;
+          bottom: 12px;
+          right: 12px;
+          background: rgba(0, 0, 0, 0.6);
+          color: #fff;
+          padding: 2px 10px;
+          border-radius: 10px;
+          font-size: 0.65rem;
+          font-weight: 500;
+          backdrop-filter: blur(4px);
+          z-index: 2;
+          display: flex;
+          align-items: center;
+          gap: 4px;
         }
 
         .prod-card-body {
@@ -688,6 +849,28 @@ const Product = () => {
           font-size: 1rem;
         }
 
+        /* ── Media Type Indicator ── */
+        .prod-media-type {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          font-size: 0.6rem;
+          color: #78909c;
+          background: rgba(0,0,0,0.6);
+          padding: 2px 8px;
+          border-radius: 10px;
+          color: #fff;
+          position: absolute;
+          bottom: 12px;
+          left: 12px;
+          z-index: 2;
+        }
+
+        .prod-media-type svg {
+          width: 12px;
+          height: 12px;
+        }
+
         @media (max-width: 768px) {
           .prod-header { flex-direction: column; align-items: stretch; }
           .prod-header-actions { flex-direction: column; }
@@ -713,6 +896,7 @@ const Product = () => {
           .prod-card-body { padding: 14px 16px; }
           .prod-card-name { font-size: 0.95rem; }
           .prod-card-price { font-size: 1rem; }
+          .prod-card-image { height: 180px; }
         }
       `}</style>
 
@@ -812,6 +996,9 @@ const Product = () => {
                 const farmerName = product.farmer?.name || 'Unknown Farmer';
                 const locationDisplay = getLocationDisplay(product);
                 const unitLabel = getUnitLabel(product.unit);
+                const media = getFirstMedia(product);
+                const isVideo = media ? isVideoUrl(media.url) : false;
+                const mediaCount = product.images?.length || 0;
                 
                 return (
                   <div 
@@ -819,21 +1006,53 @@ const Product = () => {
                     className={`prod-card ${viewMode === 'list' ? 'list-mode' : ''}`}
                     onClick={() => handleProductClick(product._id)}
                   >
-                    {/* Image */}
+                    {/* Media */}
                     <div className="prod-card-image">
-                      {getProductImage(product) ? (
-                        <img
-                          src={getProductImage(product)}
-                          alt={product.name}
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                            e.target.parentElement.innerHTML = `<div class="no-image">No Image</div>`;
-                          }}
-                        />
+                      {media ? (
+                        isVideo ? (
+                          <div className="prod-video-thumbnail">
+                            <video
+                              src={media.url.startsWith('http') ? media.url : `${API_BASE_URL}${media.url}`}
+                              muted
+                              playsInline
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                                e.target.parentElement.innerHTML = `<div class="prod-no-image">Video Error</div>`;
+                              }}
+                            />
+                            <div className="prod-video-overlay">
+                              <PlayIcon size={40} />
+                              <span className="prod-video-badge">
+                                <VideoIcon size={12} /> VIDEO
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          <img
+                            src={media.url.startsWith('http') ? media.url : `${API_BASE_URL}${media.url}`}
+                            alt={product.name}
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                              e.target.parentElement.innerHTML = `<div class="prod-no-image">No Image</div>`;
+                            }}
+                          />
+                        )
                       ) : (
-                        <div className="no-image">No Image</div>
+                        <div className="prod-no-image">No Media</div>
                       )}
                       <span className="category-badge">{product.category}</span>
+                      
+                      {mediaCount > 1 && (
+                        <span className="prod-media-count">
+                          +{mediaCount - 1} more
+                        </span>
+                      )}
+                      
+                      {media && isVideo && (
+                        <span className="prod-media-type">
+                          <VideoIcon size={12} /> Video
+                        </span>
+                      )}
                     </div>
 
                     {/* Body */}
