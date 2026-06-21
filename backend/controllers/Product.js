@@ -287,23 +287,34 @@ exports.updateProduct = async (req, res) => {
         console.log('📝 Update product request received');
         const productId = req.params.id;
         const farmerId = req.user.id;
+        
+        console.log('🔍 Debug - Farmer ID from token:', farmerId);
+        console.log('🔍 Debug - Product ID:', productId);
 
         // Find product
         const product = await Product.findById(productId);
         if (!product) {
+            console.log('❌ Product not found with ID:', productId);
             return res.status(404).json({
                 success: false,
                 message: 'Product not found'
             });
         }
 
-        // Check if product belongs to farmer
-        if (product.farmer.toString() !== farmerId) {
+        console.log('🔍 Debug - Product farmer ID:', product.farmer.toString());
+        console.log('🔍 Debug - Farmer ID from token:', farmerId.toString());
+
+        // Check if product belongs to farmer using equals() method
+        if (!product.farmer.equals(farmerId)) {
+            console.log('❌ Authorization failed - Product farmer:', product.farmer.toString());
+            console.log('❌ Authorization failed - Token farmer:', farmerId.toString());
             return res.status(403).json({
                 success: false,
                 message: 'You are not authorized to update this product'
             });
         }
+
+        console.log('✅ Authorization successful');
 
         const {
             name,
@@ -405,8 +416,8 @@ exports.deleteProduct = async (req, res) => {
             });
         }
 
-        // Check if product belongs to farmer
-        if (product.farmer.toString() !== farmerId) {
+        // Check if product belongs to farmer using equals() method
+        if (!product.farmer.equals(farmerId)) {
             return res.status(403).json({
                 success: false,
                 message: 'You are not authorized to delete this product'

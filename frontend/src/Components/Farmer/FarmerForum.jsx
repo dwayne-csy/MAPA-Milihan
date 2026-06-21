@@ -49,6 +49,12 @@ const getInitial = (name) => {
   return name.charAt(0).toUpperCase();
 };
 
+// Helper to compare user IDs safely
+const compareUserId = (id1, id2) => {
+  if (!id1 || !id2) return false;
+  return id1.toString() === id2.toString();
+};
+
 const FarmerForum = () => {
   const [user, setUser] = useState(null);
   const [posts, setPosts] = useState([]);
@@ -106,6 +112,9 @@ const FarmerForum = () => {
       try {
         const parsed = typeof userData === 'string' ? JSON.parse(userData) : userData;
         setUser(parsed);
+        console.log('👤 User loaded:', parsed);
+        console.log('👤 User ID:', parsed.id || parsed._id);
+        console.log('👤 User Type:', parsed.userType || parsed.role);
       } catch (e) {
         console.error('Error parsing user data:', e);
       }
@@ -120,6 +129,15 @@ const FarmerForum = () => {
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const response = await axios.get(`${API_BASE_URL}/api/forums/posts?page=${pageNum}&limit=10`, { headers });
       const postsData = response.data.data;
+      
+      // Log posts data to debug userType
+      console.log('📊 Posts data:', postsData.map(p => ({
+        id: p._id,
+        title: p.title,
+        author: p.author,
+        userType: p.author?.userType
+      })));
+      
       setPosts(postsData);
       setTotalPages(response.data.pagination.pages);
       setPage(pageNum);
@@ -962,9 +980,14 @@ const FarmerForum = () => {
 
   // Render comment with nested replies
   const renderCommentTree = (post, comment, depth = 0) => {
-    const isCommentAuthor = user && comment.author.userId === user.id;
-    const isPostOwner = user && post.author.userId === user.id;
-    const canDeleteComment = isPostOwner || isCommentAuthor || user?.userType === 'Admin';
+    const userId = user?.id || user?._id;
+    const commentAuthorId = comment.author?.userId;
+    const postAuthorId = post.author?.userId;
+    
+    const isCommentAuthor = userId && commentAuthorId && compareUserId(userId, commentAuthorId);
+    const isPostOwner = userId && postAuthorId && compareUserId(userId, postAuthorId);
+    const canDeleteComment = isPostOwner || isCommentAuthor || user?.userType === 'Admin' || user?.role === 'Admin';
+    
     const isReply = depth > 0;
     const hasReplies = comment.replies && comment.replies.length > 0;
     const isExpanded = expandedComments[comment._id] !== undefined ? expandedComments[comment._id] : true;
@@ -1006,6 +1029,9 @@ const FarmerForum = () => {
                 {comment.author.userType === 'Admin' && (
                   <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">Admin</span>
                 )}
+                {comment.author.userType === 'Farmer' && (
+                  <span className="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">Farmer</span>
+                )}
                 {isPostOwner && !isCommentAuthor && (
                   <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">Post Owner</span>
                 )}
@@ -1028,10 +1054,11 @@ const FarmerForum = () => {
                 {canDeleteComment && (
                   <button
                     onClick={() => openDeleteCommentModal(comment._id)}
-                    className="text-gray-400 hover:text-red-600 transition-colors p-1"
+                    className="text-gray-400 hover:text-red-600 transition-colors p-1 flex items-center gap-1"
                     title="Delete comment"
                   >
                     <TrashIcon size={14} />
+                    <span className="text-xs">Delete</span>
                   </button>
                 )}
               </div>
@@ -1074,7 +1101,7 @@ const FarmerForum = () => {
               </button>
             </div>
             
-            {/* Reply input for this comment - INLINE STYLE */}
+            {/* Reply input for this comment */}
             {showReplyInput && showReplyInput.commentId === comment._id && showReplyInput.postId === post._id && (
               <div className="mt-3 pt-2">
                 <div className="flex items-center gap-2">
@@ -1385,9 +1412,15 @@ const FarmerForum = () => {
           )}
           
           {posts.map(post => {
-            const isPostOwner = user && post.author.userId === user.id;
+            const userId = user?.id || user?._id;
+            const postAuthorId = post.author?.userId;
+            const isPostOwner = userId && postAuthorId && compareUserId(userId, postAuthorId);
+            
             const postAvatarUrl = getUserAvatarUrl(post.author);
             const postAvatarColor = getDefaultAvatarColor(post.author?.userType || 'User');
+            
+            // Get the correct user type display
+            const userTypeDisplay = post.author?.userType || 'User';
             
             return (
               <div key={post._id} className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow duration-200">
@@ -1416,7 +1449,9 @@ const FarmerForum = () => {
                   <div className="flex-1">
                     <p className="font-semibold text-gray-800">{post.author.name}</p>
                     <div className="flex items-center gap-2 text-xs text-gray-500">
-                      <span>{post.author.userType}</span>
+                      <span className={userTypeDisplay === 'Farmer' ? 'text-emerald-600 font-medium' : ''}>
+                        {userTypeDisplay}
+                      </span>
                       <span>•</span>
                       <span>{new Date(post.createdAt).toLocaleDateString()}</span>
                     </div>
@@ -1445,6 +1480,11 @@ const FarmerForum = () => {
                     )}
                   </div>
                 </div>
+                
+                {/* DISPLAY TITLE */}
+                {post.title && (
+                  <h3 className="text-xl font-semibold text-gray-800 mb-2">{post.title}</h3>
+                )}
                 
                 <p className="text-gray-700 leading-relaxed mb-3">{post.content}</p>
                 
@@ -1492,7 +1532,7 @@ const FarmerForum = () => {
                       <p className="text-gray-500 text-sm">No comments yet. Be the first to comment!</p>
                     )}
                     
-                    {/* Add new comment - INLINE STYLE */}
+                    {/* Add new comment */}
                     <div className="mt-4 flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-xs flex-shrink-0 overflow-hidden">
                         {getUserAvatarUrl(user) ? (

@@ -130,29 +130,37 @@ const uploadFilesToCloudinaryWithTempFiles = async (files, folder = 'Mapa-Miliha
   return successfulUploads;
 };
 
-// Create post with media upload
+// ========== CREATE POST - FIXED ==========
 exports.createPost = async (req, res) => {
   try {
     console.log('📝 Create post request received');
     console.log('📋 Request body:', req.body);
     console.log('📋 Request files:', req.files ? req.files.length : 0);
     
-    if (req.files && req.files.length > 0) {
-      req.files.forEach((file, index) => {
-        console.log(`📎 File ${index + 1}:`, {
-          originalname: file.originalname,
-          mimetype: file.mimetype,
-          size: file.size,
-          hasPath: !!file.path,
-          hasBuffer: !!file.buffer
-        });
-      });
-    }
+    // LOG THE USER OBJECT TO DEBUG
+    console.log('👤 User object:', JSON.stringify(req.user, null, 2));
+    console.log('👤 User Type from req.user:', req.user.userType);
+    console.log('👤 User Role from req.user:', req.user.role);
     
     const { title, content, category } = req.body;
     const userId = req.user.id;
-    const userType = req.user.userType || 'User';
-    const userName = req.user.name || req.user.username;
+    
+    // FIX: Determine userType based on role
+    // This is the most reliable way - check the role from the user object
+    let userType = 'User';
+    if (req.user.role === 'farmer') {
+      userType = 'Farmer';
+    } else if (req.user.role === 'admin') {
+      userType = 'Admin';
+    } else if (req.user.userType) {
+      // Fallback to userType if it exists
+      userType = req.user.userType;
+    }
+    
+    const userName = req.user.name || req.user.username || 'User';
+
+    console.log(`👤 Final userType: ${userType}, userName: ${userName}`);
+    console.log(`👤 User ID: ${userId}`);
 
     if (!title || !title.trim()) {
       return res.status(400).json({
@@ -170,8 +178,7 @@ exports.createPost = async (req, res) => {
 
     const files = req.files || [];
     let mediaUrls = [];
-    let uploadErrors = [];
-    
+
     if (files && files.length > 0) {
       try {
         const uploadedFiles = await uploadFilesToCloudinaryWithTempFiles(
@@ -188,13 +195,9 @@ exports.createPost = async (req, res) => {
             size: file.size,
             originalname: file.originalname
           }));
-          console.log(`✅ Uploaded ${mediaUrls.length} files successfully`);
-        } else {
-          uploadErrors.push('Failed to upload media files');
         }
       } catch (uploadError) {
         console.error('Media upload error:', uploadError);
-        uploadErrors.push(uploadError.message);
       }
     }
 
@@ -204,22 +207,22 @@ exports.createPost = async (req, res) => {
       category: category || 'General',
       media: mediaUrls,
       author: {
-        userId,
-        userType,
+        userId: userId,
+        userType: userType, // Now correctly set based on role
         name: userName
       }
     });
 
     await post.save();
     
-    console.log(`✅ Post created successfully: ${post._id}`);
+    console.log(`✅ Post created successfully by ${userName} (${userType})`);
+    console.log('📊 Post author data:', JSON.stringify(post.author, null, 2));
     
     res.status(201).json({
       success: true,
       message: 'Post created successfully',
       data: post,
-      mediaUploaded: mediaUrls.length,
-      warnings: uploadErrors.length > 0 ? uploadErrors : undefined
+      mediaUploaded: mediaUrls.length
     });
   } catch (error) {
     console.error('Create post error:', error);
@@ -231,7 +234,7 @@ exports.createPost = async (req, res) => {
   }
 };
 
-// Get all posts with pagination and filters
+// ========== GET ALL POSTS ==========
 exports.getAllPosts = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -269,6 +272,10 @@ exports.getAllPosts = async (req, res) => {
         );
         post.likeCount = post.likes.length;
         post.isOwner = post.author.userId.toString() === userId;
+        // Ensure userType is properly set in the response
+        if (post.author && !post.author.userType) {
+          post.author.userType = 'User'; // Default fallback
+        }
       });
     }
 
@@ -292,7 +299,7 @@ exports.getAllPosts = async (req, res) => {
   }
 };
 
-// Get single post with comments
+// ========== GET SINGLE POST ==========
 exports.getPostById = async (req, res) => {
   try {
     const postId = req.params.id;
@@ -338,13 +345,22 @@ exports.getPostById = async (req, res) => {
   }
 };
 
-// Update post
+// ========== UPDATE POST ==========
 exports.updatePost = async (req, res) => {
   try {
     const postId = req.params.id;
     const { title, content, category, removeMediaIds } = req.body;
     const userId = req.user.id;
-    const userType = req.user.userType || 'User';
+    
+    // Determine userType from role
+    let userType = 'User';
+    if (req.user.role === 'farmer') {
+      userType = 'Farmer';
+    } else if (req.user.role === 'admin') {
+      userType = 'Admin';
+    } else if (req.user.userType) {
+      userType = req.user.userType;
+    }
 
     const post = await ForumPost.findById(postId);
 
@@ -419,12 +435,21 @@ exports.updatePost = async (req, res) => {
   }
 };
 
-// Delete post - FIXED: Allow post owner to delete
+// ========== DELETE POST ==========
 exports.deletePost = async (req, res) => {
   try {
     const postId = req.params.id;
     const userId = req.user.id;
-    const userType = req.user.userType;
+    
+    // Determine userType from role
+    let userType = 'User';
+    if (req.user.role === 'farmer') {
+      userType = 'Farmer';
+    } else if (req.user.role === 'admin') {
+      userType = 'Admin';
+    } else if (req.user.userType) {
+      userType = req.user.userType;
+    }
 
     const post = await ForumPost.findById(postId);
 
@@ -471,13 +496,23 @@ exports.deletePost = async (req, res) => {
   }
 };
 
-// Add comment to post with media (supports nested replies)
+// ========== ADD COMMENT ==========
 exports.addComment = async (req, res) => {
   try {
     const postId = req.params.id;
     const { content, parentCommentId, replyToUserId, replyToUserName } = req.body;
     const userId = req.user.id;
-    const userType = req.user.userType || 'User';
+    
+    // Determine userType from role
+    let userType = 'User';
+    if (req.user.role === 'farmer') {
+      userType = 'Farmer';
+    } else if (req.user.role === 'admin') {
+      userType = 'Admin';
+    } else if (req.user.userType) {
+      userType = req.user.userType;
+    }
+    
     const userName = req.user.name || req.user.username;
 
     const post = await ForumPost.findById(postId);
@@ -544,7 +579,7 @@ exports.addComment = async (req, res) => {
   }
 };
 
-// Update comment
+// ========== UPDATE COMMENT ==========
 exports.updateComment = async (req, res) => {
   try {
     const postId = req.params.id;
@@ -582,7 +617,8 @@ exports.updateComment = async (req, res) => {
     const files = req.files || [];
     if (files && files.length > 0) {
       try {
-        const uploadedFiles = await uploadFilesToCloudinaryWithTempFiles(files, `mapa-milihan/${comment.author.userType.toLowerCase()}s/comments`);
+        const userType = comment.author.userType || 'User';
+        const uploadedFiles = await uploadFilesToCloudinaryWithTempFiles(files, `mapa-milihan/${userType.toLowerCase()}s/comments`);
         
         if (uploadedFiles && uploadedFiles.length > 0) {
           const newMedia = uploadedFiles.map(file => ({
@@ -631,13 +667,22 @@ exports.updateComment = async (req, res) => {
   }
 };
 
-// Delete comment - FIXED PERMISSIONS
+// ========== DELETE COMMENT ==========
 exports.deleteComment = async (req, res) => {
   try {
     const postId = req.params.id;
     const commentId = req.params.commentId;
     const userId = req.user.id;
-    const userType = req.user.userType;
+    
+    // Determine userType from role
+    let userType = 'User';
+    if (req.user.role === 'farmer') {
+      userType = 'Farmer';
+    } else if (req.user.role === 'admin') {
+      userType = 'Admin';
+    } else if (req.user.userType) {
+      userType = req.user.userType;
+    }
 
     const post = await ForumPost.findById(postId);
 
@@ -696,12 +741,21 @@ exports.deleteComment = async (req, res) => {
   }
 };
 
-// Toggle like on post
+// ========== TOGGLE LIKE ON POST ==========
 exports.toggleLikePost = async (req, res) => {
   try {
     const postId = req.params.id;
     const userId = req.user.id;
-    const userType = req.user.userType || 'User';
+    
+    // Determine userType from role
+    let userType = 'User';
+    if (req.user.role === 'farmer') {
+      userType = 'Farmer';
+    } else if (req.user.role === 'admin') {
+      userType = 'Admin';
+    } else if (req.user.userType) {
+      userType = req.user.userType;
+    }
 
     const post = await ForumPost.findById(postId);
 
@@ -745,13 +799,22 @@ exports.toggleLikePost = async (req, res) => {
   }
 };
 
-// Toggle like on comment
+// ========== TOGGLE LIKE ON COMMENT ==========
 exports.toggleLikeComment = async (req, res) => {
   try {
     const postId = req.params.id;
     const commentId = req.params.commentId;
     const userId = req.user.id;
-    const userType = req.user.userType || 'User';
+    
+    // Determine userType from role
+    let userType = 'User';
+    if (req.user.role === 'farmer') {
+      userType = 'Farmer';
+    } else if (req.user.role === 'admin') {
+      userType = 'Admin';
+    } else if (req.user.userType) {
+      userType = req.user.userType;
+    }
 
     const post = await ForumPost.findById(postId);
 
@@ -804,13 +867,22 @@ exports.toggleLikeComment = async (req, res) => {
   }
 };
 
-// Report post
+// ========== REPORT POST ==========
 exports.reportPost = async (req, res) => {
   try {
     const postId = req.params.id;
     const { reason, description } = req.body;
     const userId = req.user.id;
-    const userType = req.user.userType || 'User';
+    
+    // Determine userType from role
+    let userType = 'User';
+    if (req.user.role === 'farmer') {
+      userType = 'Farmer';
+    } else if (req.user.role === 'admin') {
+      userType = 'Admin';
+    } else if (req.user.userType) {
+      userType = req.user.userType;
+    }
 
     const post = await ForumPost.findById(postId);
 
@@ -863,14 +935,23 @@ exports.reportPost = async (req, res) => {
   }
 };
 
-// Report comment
+// ========== REPORT COMMENT ==========
 exports.reportComment = async (req, res) => {
   try {
     const postId = req.params.id;
     const commentId = req.params.commentId;
     const { reason, description } = req.body;
     const userId = req.user.id;
-    const userType = req.user.userType || 'User';
+    
+    // Determine userType from role
+    let userType = 'User';
+    if (req.user.role === 'farmer') {
+      userType = 'Farmer';
+    } else if (req.user.role === 'admin') {
+      userType = 'Admin';
+    } else if (req.user.userType) {
+      userType = req.user.userType;
+    }
 
     const post = await ForumPost.findById(postId);
 
@@ -936,12 +1017,22 @@ exports.reportComment = async (req, res) => {
   }
 };
 
-// Send a message with media
+// ========== SEND MESSAGE ==========
 exports.sendMessage = async (req, res) => {
   try {
     const { receiverId, receiverType, receiverName, content } = req.body;
     const senderId = req.user.id;
-    const senderType = req.user.userType || 'User';
+    
+    // Determine senderType from role
+    let senderType = 'User';
+    if (req.user.role === 'farmer') {
+      senderType = 'Farmer';
+    } else if (req.user.role === 'admin') {
+      senderType = 'Admin';
+    } else if (req.user.userType) {
+      senderType = req.user.userType;
+    }
+    
     const senderName = req.user.name || req.user.username;
 
     if (!receiverId || !receiverType) {
@@ -1028,7 +1119,7 @@ exports.sendMessage = async (req, res) => {
   }
 };
 
-// Get user conversations
+// ========== GET CONVERSATIONS ==========
 exports.getConversations = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -1065,7 +1156,7 @@ exports.getConversations = async (req, res) => {
   }
 };
 
-// Get conversation messages
+// ========== GET CONVERSATION MESSAGES ==========
 exports.getConversationMessages = async (req, res) => {
   try {
     const conversationId = req.params.id;
@@ -1114,14 +1205,23 @@ exports.getConversationMessages = async (req, res) => {
   }
 };
 
-// Report message
+// ========== REPORT MESSAGE ==========
 exports.reportMessage = async (req, res) => {
   try {
     const conversationId = req.params.id;
     const messageId = req.params.messageId;
     const { reason, description } = req.body;
     const userId = req.user.id;
-    const userType = req.user.userType || 'User';
+    
+    // Determine userType from role
+    let userType = 'User';
+    if (req.user.role === 'farmer') {
+      userType = 'Farmer';
+    } else if (req.user.role === 'admin') {
+      userType = 'Admin';
+    } else if (req.user.userType) {
+      userType = req.user.userType;
+    }
 
     const conversation = await Message.findById(conversationId);
 

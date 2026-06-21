@@ -49,8 +49,15 @@ const getInitial = (name) => {
   return name.charAt(0).toUpperCase();
 };
 
+// Helper to compare user IDs safely
+const compareUserId = (id1, id2) => {
+  if (!id1 || !id2) return false;
+  return id1.toString() === id2.toString();
+};
+
 const UserForum = () => {
   const [user, setUser] = useState(null);
+  const [userId, setUserId] = useState(null); // Store user ID separately
   const [posts, setPosts] = useState([]);
   const [selectedPost, setSelectedPost] = useState(null);
   const [newPost, setNewPost] = useState({ 
@@ -99,18 +106,56 @@ const UserForum = () => {
 
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001';
 
-  // Get user from localStorage
+  // Get user from localStorage and extract ID from token
   useEffect(() => {
     const userData = localStorage.getItem('user');
+    const token = localStorage.getItem('token');
+    
     if (userData) {
       try {
         const parsed = typeof userData === 'string' ? JSON.parse(userData) : userData;
         setUser(parsed);
+        console.log('👤 User loaded:', parsed);
+        console.log('👤 User keys:', Object.keys(parsed || {}));
       } catch (e) {
         console.error('Error parsing user data:', e);
       }
     }
+    
+    // Extract user ID from JWT token
+    if (token) {
+      try {
+        // JWT tokens are base64 encoded, we can decode the payload
+        const tokenParts = token.split('.');
+        if (tokenParts.length === 3) {
+          const payload = JSON.parse(atob(tokenParts[1]));
+          console.log('🔑 Token payload:', payload);
+          if (payload.id) {
+            setUserId(payload.id);
+            console.log('✅ User ID from token:', payload.id);
+          }
+        }
+      } catch (e) {
+        console.error('Error decoding token:', e);
+      }
+    }
+    
+    // If token doesn't have ID, try to get it from the user object
+    if (!userId) {
+      // Try to get ID from user object
+      const id = userData?._id || userData?.id || userData?.userId;
+      if (id) {
+        setUserId(id);
+      }
+    }
   }, []);
+
+  // Fetch posts - only after user and userId are loaded
+  useEffect(() => {
+    if (user !== null && userId !== null) {
+      fetchPosts();
+    }
+  }, [user, userId]);
 
   // Fetch posts
   const fetchPosts = async (pageNum = 1) => {
@@ -120,6 +165,15 @@ const UserForum = () => {
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const response = await axios.get(`${API_BASE_URL}/api/forums/posts?page=${pageNum}&limit=10`, { headers });
       const postsData = response.data.data;
+      
+      console.log('📊 Posts data:', postsData.map(p => ({
+        id: p._id,
+        title: p.title,
+        author: p.author,
+        userType: p.author?.userType,
+        authorUserId: p.author?.userId
+      })));
+      
       setPosts(postsData);
       setTotalPages(response.data.pagination.pages);
       setPage(pageNum);
@@ -232,10 +286,6 @@ const UserForum = () => {
     
     return null;
   };
-
-  useEffect(() => {
-    fetchPosts();
-  }, []);
 
   // Handle file selection for post
   const handleFileSelect = (e) => {
@@ -357,7 +407,7 @@ const UserForum = () => {
         formData.append('media', file);
       });
 
-      const response = await axios.post(`${API_BASE_URL}/api/forums/posts`, formData, {
+      await axios.post(`${API_BASE_URL}/api/forums/posts`, formData, {
         headers: { 
           Authorization: `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'
@@ -962,9 +1012,15 @@ const UserForum = () => {
 
   // Render comment with nested replies
   const renderCommentTree = (post, comment, depth = 0) => {
-    const isCommentAuthor = user && comment.author.userId === user.id;
-    const isPostOwner = user && post.author.userId === user.id;
-    const canDeleteComment = isPostOwner || isCommentAuthor || user?.userType === 'Admin';
+    // Use userId from state (extracted from token)
+    const currentUserId = userId;
+    const commentAuthorId = comment.author?.userId;
+    const postAuthorId = post.author?.userId;
+    
+    const isCommentAuthor = currentUserId && commentAuthorId && compareUserId(currentUserId, commentAuthorId);
+    const isPostOwner = currentUserId && postAuthorId && compareUserId(currentUserId, postAuthorId);
+    const canDeleteComment = isPostOwner || isCommentAuthor || user?.role === 'admin';
+    
     const isReply = depth > 0;
     const hasReplies = comment.replies && comment.replies.length > 0;
     const isExpanded = expandedComments[comment._id] !== undefined ? expandedComments[comment._id] : true;
@@ -1006,6 +1062,9 @@ const UserForum = () => {
                 {comment.author.userType === 'Admin' && (
                   <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">Admin</span>
                 )}
+                {comment.author.userType === 'Farmer' && (
+                  <span className="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">Farmer</span>
+                )}
                 {isPostOwner && !isCommentAuthor && (
                   <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">Post Owner</span>
                 )}
@@ -1028,10 +1087,11 @@ const UserForum = () => {
                 {canDeleteComment && (
                   <button
                     onClick={() => openDeleteCommentModal(comment._id)}
-                    className="text-gray-400 hover:text-red-600 transition-colors p-1"
+                    className="text-gray-400 hover:text-red-600 transition-colors p-1 flex items-center gap-1"
                     title="Delete comment"
                   >
                     <TrashIcon size={14} />
+                    <span className="text-xs">Delete</span>
                   </button>
                 )}
               </div>
@@ -1074,7 +1134,7 @@ const UserForum = () => {
               </button>
             </div>
             
-            {/* Reply input for this comment - INLINE STYLE */}
+            {/* Reply input for this comment */}
             {showReplyInput && showReplyInput.commentId === comment._id && showReplyInput.postId === post._id && (
               <div className="mt-3 pt-2">
                 <div className="flex items-center gap-2">
@@ -1197,7 +1257,8 @@ const UserForum = () => {
     );
   };
 
-  if (!user) {
+  // Show loading while user is being loaded
+  if (user === null || userId === null) {
     return (
       <div className="full-bleed w-full min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
@@ -1385,9 +1446,25 @@ const UserForum = () => {
           )}
           
           {posts.map(post => {
-            const isPostOwner = user && post.author.userId === user.id;
+            // Use userId from state (extracted from token)
+            const currentUserId = userId;
+            const postAuthorId = post.author?.userId;
+            const isPostOwner = currentUserId && postAuthorId && compareUserId(currentUserId, postAuthorId);
+            
+            // Debug log
+            console.log('🔍 Post ownership check:', {
+              postId: post._id,
+              postTitle: post.title,
+              currentUserId: currentUserId,
+              postAuthorId: postAuthorId,
+              isPostOwner: isPostOwner
+            });
+            
             const postAvatarUrl = getUserAvatarUrl(post.author);
             const postAvatarColor = getDefaultAvatarColor(post.author?.userType || 'User');
+            
+            // Get the correct user type display
+            const userTypeDisplay = post.author?.userType || 'User';
             
             return (
               <div key={post._id} className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow duration-200">
@@ -1416,7 +1493,9 @@ const UserForum = () => {
                   <div className="flex-1">
                     <p className="font-semibold text-gray-800">{post.author.name}</p>
                     <div className="flex items-center gap-2 text-xs text-gray-500">
-                      <span>{post.author.userType}</span>
+                      <span className={userTypeDisplay === 'Farmer' ? 'text-emerald-600 font-medium' : ''}>
+                        {userTypeDisplay}
+                      </span>
                       <span>•</span>
                       <span>{new Date(post.createdAt).toLocaleDateString()}</span>
                     </div>
@@ -1425,6 +1504,7 @@ const UserForum = () => {
                     <span className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-xs font-medium">
                       {post.category}
                     </span>
+                    {/* EDIT AND DELETE BUTTONS FOR POST OWNER */}
                     {isPostOwner && (
                       <>
                         <button
@@ -1445,6 +1525,11 @@ const UserForum = () => {
                     )}
                   </div>
                 </div>
+                
+                {/* DISPLAY TITLE */}
+                {post.title && (
+                  <h3 className="text-xl font-semibold text-gray-800 mb-2">{post.title}</h3>
+                )}
                 
                 <p className="text-gray-700 leading-relaxed mb-3">{post.content}</p>
                 
@@ -1492,7 +1577,7 @@ const UserForum = () => {
                       <p className="text-gray-500 text-sm">No comments yet. Be the first to comment!</p>
                     )}
                     
-                    {/* Add new comment - INLINE STYLE */}
+                    {/* Add new comment */}
                     <div className="mt-4 flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-xs flex-shrink-0 overflow-hidden">
                         {getUserAvatarUrl(user) ? (
