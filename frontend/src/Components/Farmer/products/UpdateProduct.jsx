@@ -19,6 +19,23 @@ const ImageIcon = ({ size = 20 }) => (
   </svg>
 );
 
+const VideoIcon = ({ size = 20 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="2" width="20" height="20" rx="2.18"/>
+    <line x1="8" y1="2" x2="8" y2="22"/>
+    <line x1="16" y1="2" x2="16" y2="22"/>
+    <line x1="2" y1="8" x2="22" y2="8"/>
+    <line x1="2" y1="16" x2="22" y2="16"/>
+    <polygon points="10 10 14 12 10 14 10 10"/>
+  </svg>
+);
+
+const CloseIcon = ({ size = 18 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M18 6L6 18M6 6l12 12"/>
+  </svg>
+);
+
 // ── Component ───────────────────────────────────────────────────────────
 const UpdateProduct = () => {
   const navigate = useNavigate();
@@ -38,9 +55,9 @@ const UpdateProduct = () => {
     isAvailable: true
   });
 
-  const [images, setImages] = useState([]);
-  const [imagePreviews, setImagePreviews] = useState([]);
-  const [existingImages, setExistingImages] = useState([]);
+  const [mediaFiles, setMediaFiles] = useState([]);
+  const [mediaPreviews, setMediaPreviews] = useState([]);
+  const [existingMedia, setExistingMedia] = useState([]);
 
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001';
 
@@ -80,7 +97,7 @@ const UpdateProduct = () => {
           unit: product.unit || 'kg',
           isAvailable: product.isAvailable !== undefined ? product.isAvailable : true
         });
-        setExistingImages(product.images || []);
+        setExistingMedia(product.images || []);
       } else {
         setError(data.message || 'Failed to fetch product');
       }
@@ -99,16 +116,44 @@ const UpdateProduct = () => {
     });
   };
 
-  const handleImageChange = (e) => {
+  const handleMediaChange = (e) => {
     const files = Array.from(e.target.files);
     if (files.length > 5) {
-      setError('Maximum 5 images allowed');
+      setError('Maximum 5 files allowed');
       return;
     }
 
-    setImages(files);
-    const previews = files.map(file => URL.createObjectURL(file));
-    setImagePreviews(previews);
+    setMediaFiles(files);
+    
+    const previews = files.map(file => {
+      const isVideo = file.type.startsWith('video/');
+      return {
+        url: URL.createObjectURL(file),
+        type: isVideo ? 'video' : 'image',
+        name: file.name,
+        size: file.size
+      };
+    });
+    setMediaPreviews(previews);
+  };
+
+  const handleRemoveMedia = (index) => {
+    const newFiles = [...mediaFiles];
+    const newPreviews = [...mediaPreviews];
+    
+    URL.revokeObjectURL(newPreviews[index].url);
+    
+    newFiles.splice(index, 1);
+    newPreviews.splice(index, 1);
+    
+    setMediaFiles(newFiles);
+    setMediaPreviews(newPreviews);
+  };
+
+  const formatFileSize = (bytes) => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1048576).toFixed(1) + ' MB';
   };
 
   const handleSubmit = async (e) => {
@@ -129,8 +174,8 @@ const UpdateProduct = () => {
       formDataToSend.append('unit', formData.unit);
       formDataToSend.append('isAvailable', formData.isAvailable);
 
-      images.forEach(image => {
-        formDataToSend.append('images', image);
+      mediaFiles.forEach(file => {
+        formDataToSend.append('images', file);
       });
 
       const response = await fetch(`${API_BASE_URL}/api/v1/products/${id}`, {
@@ -263,7 +308,7 @@ const UpdateProduct = () => {
           color: #78909c;
         }
 
-        /* ── Existing Images ── */
+        /* ── Existing Media ── */
         .upd-section-title {
           font-size: 0.8rem;
           font-weight: 600;
@@ -275,23 +320,38 @@ const UpdateProduct = () => {
 
         .upd-existing-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+          grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
           gap: 12px;
           margin-bottom: 22px;
         }
 
-        .upd-existing-img {
+        .upd-existing-item {
           border-radius: 10px;
           overflow: hidden;
           aspect-ratio: 1;
           background: #e8f5e9;
           border: 1.5px solid #c8e6c9;
+          position: relative;
         }
 
-        .upd-existing-img img {
+        .upd-existing-item img,
+        .upd-existing-item video {
           width: 100%;
           height: 100%;
           object-fit: cover;
+        }
+
+        .upd-existing-item .media-badge {
+          position: absolute;
+          top: 8px;
+          left: 8px;
+          background: rgba(0, 0, 0, 0.7);
+          color: #fff;
+          font-size: 0.6rem;
+          padding: 2px 10px;
+          border-radius: 12px;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
         }
 
         /* ── Form ── */
@@ -363,9 +423,15 @@ const UpdateProduct = () => {
           background: #f1f8f0;
         }
 
-        .upd-upload-area .icon {
-          color: #66BB6A;
+        .upd-upload-area .icon-wrapper {
+          display: flex;
+          justify-content: center;
+          gap: 12px;
           margin-bottom: 6px;
+        }
+
+        .upd-upload-area .icon-wrapper svg {
+          color: #66BB6A;
         }
 
         .upd-upload-area p {
@@ -379,24 +445,88 @@ const UpdateProduct = () => {
           color: #a5b8a5;
         }
 
-        .upd-image-grid {
+        .upd-media-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+          grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
           gap: 12px;
           margin-top: 16px;
         }
 
-        .upd-image-preview {
+        .upd-media-item {
+          position: relative;
           border-radius: 10px;
           overflow: hidden;
           aspect-ratio: 1;
           background: #e8f5e9;
+          border: 1.5px solid #c8e6c9;
         }
 
-        .upd-image-preview img {
+        .upd-media-item img,
+        .upd-media-item video {
           width: 100%;
           height: 100%;
           object-fit: cover;
+        }
+
+        .upd-media-item .media-type-badge {
+          position: absolute;
+          top: 8px;
+          left: 8px;
+          background: rgba(0, 0, 0, 0.7);
+          color: #fff;
+          font-size: 0.6rem;
+          padding: 2px 10px;
+          border-radius: 12px;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+        }
+
+        .upd-media-item .remove-btn {
+          position: absolute;
+          top: 8px;
+          right: 8px;
+          width: 28px;
+          height: 28px;
+          border-radius: 50%;
+          border: none;
+          background: rgba(239, 83, 80, 0.9);
+          color: #fff;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: transform 0.15s, background 0.2s;
+        }
+
+        .upd-media-item .remove-btn:hover {
+          transform: scale(1.1);
+          background: #ef5350;
+        }
+
+        .upd-media-item .file-size {
+          position: absolute;
+          bottom: 8px;
+          right: 8px;
+          background: rgba(0, 0, 0, 0.6);
+          color: #fff;
+          font-size: 0.6rem;
+          padding: 2px 8px;
+          border-radius: 8px;
+        }
+
+        .upd-media-item .file-name {
+          position: absolute;
+          bottom: 8px;
+          left: 8px;
+          right: 60px;
+          background: rgba(0, 0, 0, 0.6);
+          color: #fff;
+          font-size: 0.6rem;
+          padding: 2px 8px;
+          border-radius: 8px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
         /* ── Checkbox ── */
@@ -495,6 +625,8 @@ const UpdateProduct = () => {
           .upd-form-row { grid-template-columns: 1fr; gap: 0; }
           .upd-actions { flex-direction: column; }
           .upd-header { flex-direction: column; align-items: flex-start; }
+          .upd-existing-grid,
+          .upd-media-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
         }
       `}</style>
 
@@ -527,41 +659,76 @@ const UpdateProduct = () => {
 
             {/* ── Form ── */}
             <form onSubmit={handleSubmit}>
-              {/* Existing Images */}
-              {existingImages.length > 0 && (
+              {/* Existing Media */}
+              {existingMedia.length > 0 && (
                 <div className="upd-form-group">
-                  <label className="upd-section-title">Current Images</label>
+                  <label className="upd-section-title">Current Media</label>
                   <div className="upd-existing-grid">
-                    {existingImages.map((img, index) => (
-                      <div key={index} className="upd-existing-img">
-                        <img src={img.url} alt={`Product ${index + 1}`} />
-                      </div>
-                    ))}
+                    {existingMedia.map((media, index) => {
+                      const isVideo = media.url && (
+                        media.url.includes('.mp4') || 
+                        media.url.includes('.webm') || 
+                        media.url.includes('.mov') ||
+                        media.url.includes('.avi')
+                      );
+                      return (
+                        <div key={index} className="upd-existing-item">
+                          {isVideo ? (
+                            <video src={media.url} muted />
+                          ) : (
+                            <img src={media.url} alt={`Media ${index + 1}`} />
+                          )}
+                          <span className="media-badge">{isVideo ? 'Video' : 'Image'}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
 
-              {/* New Images */}
+              {/* New Media Upload */}
               <div className="upd-form-group">
-                <label className="upd-form-label">New Images <span style={{ fontWeight: 400, textTransform: 'none', color: '#78909c' }}>(Optional, Max 5)</span></label>
-                <div className="upd-upload-area" onClick={() => document.getElementById('imageUpload').click()}>
-                  <div className="icon"><ImageIcon size={32} /></div>
-                  <p>Click to upload new images</p>
-                  <span className="sub">PNG, JPG, JPEG • Max 5MB each</span>
+                <label className="upd-form-label">
+                  New Media <span style={{ fontWeight: 400, textTransform: 'none', color: '#78909c' }}>
+                    (Optional, Max 5 files)
+                  </span>
+                </label>
+                <div className="upd-upload-area" onClick={() => document.getElementById('mediaUpload').click()}>
+                  <div className="icon-wrapper">
+                    <ImageIcon size={32} />
+                    <VideoIcon size={32} />
+                  </div>
+                  <p>Click to upload images or videos</p>
+                  <span className="sub">PNG, JPG, JPEG, MP4, WebM, MOV • Max 100MB each</span>
                 </div>
                 <input
-                  id="imageUpload"
+                  id="mediaUpload"
                   type="file"
-                  accept="image/*"
+                  accept="image/*,video/*"
                   multiple
-                  onChange={handleImageChange}
+                  onChange={handleMediaChange}
                   style={{ display: 'none' }}
                 />
-                {imagePreviews.length > 0 && (
-                  <div className="upd-image-grid">
-                    {imagePreviews.map((preview, index) => (
-                      <div key={index} className="upd-image-preview">
-                        <img src={preview} alt={`Preview ${index + 1}`} />
+                
+                {mediaPreviews.length > 0 && (
+                  <div className="upd-media-grid">
+                    {mediaPreviews.map((preview, index) => (
+                      <div key={index} className="upd-media-item">
+                        {preview.type === 'video' ? (
+                          <video src={preview.url} muted />
+                        ) : (
+                          <img src={preview.url} alt={`Preview ${index + 1}`} />
+                        )}
+                        <span className="media-type-badge">{preview.type}</span>
+                        <span className="file-name">{preview.name}</span>
+                        <span className="file-size">{formatFileSize(preview.size)}</span>
+                        <button
+                          type="button"
+                          className="remove-btn"
+                          onClick={() => handleRemoveMedia(index)}
+                        >
+                          <CloseIcon size={14} />
+                        </button>
                       </div>
                     ))}
                   </div>

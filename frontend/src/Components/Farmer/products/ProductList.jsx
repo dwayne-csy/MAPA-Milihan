@@ -51,6 +51,37 @@ const RefreshIcon = ({ size = 16 }) => (
   </svg>
 );
 
+const PlayIcon = ({ size = 32 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+    <circle cx="12" cy="12" r="12" fill="rgba(0,0,0,0.5)"/>
+    <polygon points="10,8 16,12 10,16" fill="white"/>
+  </svg>
+);
+
+// ── Helper: Check if URL is video ─────────────────────────────────────
+const isVideoUrl = (url) => {
+  if (!url) return false;
+  const videoExtensions = ['.mp4', '.webm', '.mov', '.avi', '.mpeg', '.ogg', '.3gpp', '.flv', '.wmv'];
+  const videoMimeTypes = ['video/mp4', 'video/webm', 'video/quicktime'];
+  
+  // Check by extension
+  if (videoExtensions.some(ext => url.toLowerCase().includes(ext))) {
+    return true;
+  }
+  
+  // Check by mime type in URL (Cloudinary sometimes includes it)
+  if (videoMimeTypes.some(mime => url.toLowerCase().includes(mime))) {
+    return true;
+  }
+  
+  // Check Cloudinary resource type in URL
+  if (url.includes('/video/upload/')) {
+    return true;
+  }
+  
+  return false;
+};
+
 // ── Component ───────────────────────────────────────────────────────────
 const ProductList = () => {
   const navigate = useNavigate();
@@ -127,6 +158,46 @@ const ProductList = () => {
     product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     product.category?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // ── Media Thumbnail Component ──────────────────────────────────────
+  const MediaThumbnail = ({ media, productName }) => {
+    if (!media || !media.url) {
+      return <div className="pl-no-image">No Media</div>;
+    }
+
+    const isVideo = isVideoUrl(media.url);
+
+    if (isVideo) {
+      return (
+        <div className="pl-video-thumbnail">
+          <video
+            src={media.url}
+            muted
+            playsInline
+            onError={(e) => {
+              e.target.style.display = 'none';
+              e.target.parentElement.innerHTML = `<div class="pl-no-image">Video Error</div>`;
+            }}
+          />
+          <div className="pl-video-overlay">
+            <PlayIcon size={40} />
+            <span className="pl-video-badge">VIDEO</span>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <img
+        src={media.url}
+        alt={productName || 'Product'}
+        onError={(e) => {
+          e.target.style.display = 'none';
+          e.target.parentElement.innerHTML = `<div class="pl-no-image">No Image</div>`;
+        }}
+      />
+    );
+  };
 
   if (loading) {
     return (
@@ -397,7 +468,60 @@ const ProductList = () => {
           object-fit: cover;
         }
 
-        .pl-product-image .no-image {
+        .pl-video-thumbnail {
+          width: 100%;
+          height: 100%;
+          position: relative;
+          background: #1a1a2e;
+        }
+
+        .pl-video-thumbnail video {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+
+        .pl-video-overlay {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: rgba(0, 0, 0, 0.2);
+          transition: background 0.3s;
+        }
+
+        .pl-product-card:hover .pl-video-overlay {
+          background: rgba(0, 0, 0, 0.1);
+        }
+
+        .pl-video-overlay svg {
+          opacity: 0.9;
+          transition: transform 0.3s;
+        }
+
+        .pl-product-card:hover .pl-video-overlay svg {
+          transform: scale(1.1);
+        }
+
+        .pl-video-badge {
+          position: absolute;
+          top: 12px;
+          left: 12px;
+          background: rgba(0, 0, 0, 0.7);
+          color: #fff;
+          font-size: 0.6rem;
+          font-weight: 700;
+          padding: 2px 10px;
+          border-radius: 10px;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+        }
+
+        .pl-no-image {
           display: flex;
           align-items: center;
           justify-content: center;
@@ -419,6 +543,7 @@ const ProductList = () => {
           color: #fff;
           background: #2E7D32;
           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+          z-index: 2;
         }
 
         .pl-stock-badge.low {
@@ -584,6 +709,17 @@ const ProductList = () => {
           background: #ffcdd2;
         }
 
+        .pl-media-indicator {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          font-size: 0.6rem;
+          color: #78909c;
+          background: #e8f5e9;
+          padding: 2px 8px;
+          border-radius: 10px;
+        }
+
         @media (max-width: 640px) {
           .pl-header { flex-direction: column; align-items: stretch; }
           .pl-header-actions { flex-direction: column; }
@@ -656,6 +792,8 @@ const ProductList = () => {
                 const isLowStock = quantity > 0 && quantity < 10;
                 const isOutOfStock = quantity === 0;
                 const unitLabel = getUnitLabel(product.unit);
+                const firstMedia = product.images && product.images.length > 0 ? product.images[0] : null;
+                const isVideo = firstMedia ? isVideoUrl(firstMedia.url) : false;
                 
                 return (
                   <div 
@@ -663,23 +801,56 @@ const ProductList = () => {
                     className={`pl-product-card ${isLowStock ? 'low-stock' : ''} ${isOutOfStock ? 'out-of-stock' : ''}`}
                     onClick={() => handleProductClick(product._id)}
                   >
-                    {/* Image */}
+                    {/* Media */}
                     <div className="pl-product-image">
-                      {product.images && product.images.length > 0 ? (
-                        <img
-                          src={product.images[0].url}
-                          alt={product.name}
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                            e.target.parentElement.innerHTML = `<div class="no-image">No Image</div>`;
-                          }}
-                        />
+                      {firstMedia ? (
+                        isVideo ? (
+                          <div className="pl-video-thumbnail">
+                            <video
+                              src={firstMedia.url}
+                              muted
+                              playsInline
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                                e.target.parentElement.innerHTML = `<div class="pl-no-image">Video Error</div>`;
+                              }}
+                            />
+                            <div className="pl-video-overlay">
+                              <PlayIcon size={40} />
+                              <span className="pl-video-badge">VIDEO</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <img
+                            src={firstMedia.url}
+                            alt={product.name}
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                              e.target.parentElement.innerHTML = `<div class="pl-no-image">No Image</div>`;
+                            }}
+                          />
+                        )
                       ) : (
-                        <div className="no-image">No Image</div>
+                        <div className="pl-no-image">No Media</div>
                       )}
                       <span className={`pl-stock-badge ${isOutOfStock ? 'out' : isLowStock ? 'low' : ''}`}>
                         {isOutOfStock ? 'Out of Stock' : isLowStock ? 'Low Stock' : 'In Stock'}
                       </span>
+                      {product.images && product.images.length > 1 && (
+                        <span className="pl-media-indicator" style={{
+                          position: 'absolute',
+                          bottom: '8px',
+                          right: '8px',
+                          background: 'rgba(0,0,0,0.7)',
+                          color: '#fff',
+                          zIndex: 2,
+                          fontSize: '0.6rem',
+                          padding: '2px 8px',
+                          borderRadius: '10px'
+                        }}>
+                          +{product.images.length - 1} more
+                        </span>
+                      )}
                     </div>
 
                     {/* Body */}
