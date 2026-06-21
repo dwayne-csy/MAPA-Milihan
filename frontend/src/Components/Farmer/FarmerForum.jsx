@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import Header from '../layouts/Header';
+import FarmerHeader from '../layouts/FarmerHeader';
 
 // ── Icons ───────────────────────────────────────────────────────────────
 const EditIcon = ({ size = 18 }) => (
@@ -45,11 +45,11 @@ const getDefaultAvatarColor = (userType) => {
 };
 
 const getInitial = (name) => {
-  if (!name) return 'U';
+  if (!name) return 'F';
   return name.charAt(0).toUpperCase();
 };
 
-const UserForum = () => {
+const FarmerForum = () => {
   const [user, setUser] = useState(null);
   const [posts, setPosts] = useState([]);
   const [selectedPost, setSelectedPost] = useState(null);
@@ -1204,7 +1204,7 @@ const UserForum = () => {
       <div className="full-bleed w-full min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading user data...</p>
+          <p className="mt-4 text-gray-600">Loading farmer data...</p>
         </div>
       </div>
     );
@@ -1212,10 +1212,10 @@ const UserForum = () => {
 
   return (
     <div className="full-bleed w-full min-h-screen bg-gray-50 flex flex-col">
-      <Header />
+      <FarmerHeader />
       
       <div className="flex-1 max-w-4xl w-full mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">Community Forum</h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">Farmer Community Forum</h1>
         
         {/* Create Post */}
         <div className="bg-white rounded-xl shadow-md p-4 mb-6">
@@ -1230,13 +1230,13 @@ const UserForum = () => {
                     e.target.style.display = 'none';
                     const parent = e.target.parentElement;
                     const initial = getInitial(user.name);
-                    const color = getDefaultAvatarColor(user.userType || 'User');
+                    const color = getDefaultAvatarColor(user.userType || 'Farmer');
                     parent.className = `w-10 h-10 rounded-full ${color} flex items-center justify-center text-white font-semibold text-sm flex-shrink-0`;
                     parent.textContent = initial;
                   }}
                 />
               ) : (
-                <div className={`w-full h-full flex items-center justify-center ${getDefaultAvatarColor(user.userType || 'User')}`}>
+                <div className={`w-full h-full flex items-center justify-center ${getDefaultAvatarColor(user.userType || 'Farmer')}`}>
                   {getInitial(user.name)}
                 </div>
               )}
@@ -1245,7 +1245,7 @@ const UserForum = () => {
               onClick={() => setShowCreatePost(!showCreatePost)}
               className="flex-1 text-left px-4 py-2.5 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-500 transition-colors"
             >
-              What's on your mind, {user?.name?.split(' ')[0] || 'User'}?
+              What's on your mind, {user?.name?.split(' ')[0] || 'Farmer'}?
             </button>
           </div>
           
@@ -1506,13 +1506,13 @@ const UserForum = () => {
                               e.target.style.display = 'none';
                               const parent = e.target.parentElement;
                               const initial = getInitial(user.name);
-                              const color = getDefaultAvatarColor(user.userType || 'User');
+                              const color = getDefaultAvatarColor(user.userType || 'Farmer');
                               parent.className = `w-8 h-8 rounded-full ${color} flex items-center justify-center text-white font-semibold text-xs flex-shrink-0`;
                               parent.textContent = initial;
                             }}
                           />
                         ) : (
-                          <div className={`w-full h-full flex items-center justify-center ${getDefaultAvatarColor(user.userType || 'User')}`}>
+                          <div className={`w-full h-full flex items-center justify-center ${getDefaultAvatarColor(user.userType || 'Farmer')}`}>
                             {getInitial(user.name)}
                           </div>
                         )}
@@ -1919,4 +1919,4 @@ const UserForum = () => {
   );
 };
 
-export default UserForum;
+export default FarmerForum;

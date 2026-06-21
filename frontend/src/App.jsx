@@ -20,6 +20,7 @@ import ProductDetails from "./Components/User/ProductDetails";
 import ViewProduct from "./Components/Farmer/products/ViewProduct";
 import Maps from "./Components/User/Maps";
 import Forum from "./Components/User/Forum";
+import FarmerForum from "./Components/Farmer/FarmerForum";
 
 const App = () => {
   const token = isAuthenticated();
@@ -60,6 +61,7 @@ const App = () => {
         <Route path="/farmer/update-product/:id" element={<ProtectedRoute requiredRole="farmer"><UpdateProduct /></ProtectedRoute>} />
         <Route path="/farmer/edit-profile" element={<ProtectedRoute requiredRole="farmer"><FarmerEditProfile /></ProtectedRoute>} />
         <Route path="/farmer/view-product/:id" element={<ProtectedRoute requiredRole="farmer"><ViewProduct /></ProtectedRoute>} />
+        <Route path="/farmer/forum" element={<ProtectedRoute requiredRole="farmer"><FarmerForum /></ProtectedRoute>} />
 
         {/* Admin Protected Routes */}
         <Route path="/admin/dashboard" element={<ProtectedRoute requiredRole="admin"><AdminDashboard /></ProtectedRoute>} />

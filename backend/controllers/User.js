@@ -880,3 +880,45 @@ exports.updatePassword = async (req, res) => {
     });
   }
 };
+
+// ========== GET USER AVATAR BY ID ==========
+exports.getUserAvatar = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required'
+      });
+    }
+
+    const user = await User.findById(userId).select('avatar name');
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    // Get avatar URL
+    let avatarUrl = null;
+    if (user.avatar && user.avatar.url) {
+      avatarUrl = user.avatar.url;
+    }
+    
+    res.status(200).json({
+      success: true,
+      avatarUrl: avatarUrl,
+      name: user.name
+    });
+  } catch (error) {
+    console.error('❌ GET AVATAR ERROR:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching avatar',
+      error: error.message
+    });
+  }
+};

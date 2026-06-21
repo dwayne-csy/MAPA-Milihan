@@ -11,7 +11,7 @@ cloudinary.config({
   cdn_subdomain: true
 });
 
-// Upload to Cloudinary - supports both images and videos
+// Upload to Cloudinary - OPTIMIZED
 const uploadToCloudinary = async (input, folder = 'mapa-milihan', resourceType = 'auto') => {
   try {
     console.log('☁️ Cloudinary upload started');
@@ -22,7 +22,6 @@ const uploadToCloudinary = async (input, folder = 'mapa-milihan', resourceType =
     let isVideo = false;
     
     if (resourceType === 'auto' && typeof input === 'string') {
-      // Check if it's a video from base64
       if (input.startsWith('data:video') || 
           input.includes('video/mp4') || 
           input.includes('video/webm') ||
@@ -54,7 +53,7 @@ const uploadToCloudinary = async (input, folder = 'mapa-milihan', resourceType =
       timeout: 180000 // 3 minutes for videos
     };
 
-    // If it's a video, add video-specific options
+    // If it's a video, add video-specific options - OPTIMIZED
     if (isVideo || detectedType === 'video') {
       uploadOptions.eager = [
         { width: 1280, height: 720, crop: 'limit', format: 'mp4' },
@@ -62,7 +61,12 @@ const uploadToCloudinary = async (input, folder = 'mapa-milihan', resourceType =
       ];
       uploadOptions.eager_async = true;
       uploadOptions.format = 'mp4';
+      uploadOptions.quality = 'auto:low';
+      uploadOptions.bit_rate = '500k';
       console.log('🎥 Applying video-specific upload options');
+    } else {
+      uploadOptions.quality = 'auto:good';
+      uploadOptions.fetch_format = 'auto';
     }
 
     let toUpload;

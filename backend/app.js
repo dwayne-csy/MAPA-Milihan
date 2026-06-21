@@ -19,14 +19,14 @@ const userRoutes = require('./routes/User');
 const productRoutes = require('./routes/Product');
 const groqChatbotRoutes = require('./routes/groqchatbot');
 const forumRoutes = require('./routes/Forum');
-const uploadRoutes = require('./routes/uploadRoutes'); // <-- ADD THIS
+const uploadRoutes = require('./routes/uploadRoutes');
 
 // Use routes
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/products', productRoutes);
 app.use('/api/v1/groqchatbot', groqChatbotRoutes);
 app.use('/api/forums', forumRoutes);
-app.use('/api/v1/upload', uploadRoutes); // <-- ADD THIS
+app.use('/api/v1/upload', uploadRoutes);
 
 // ========== HEALTH CHECK ENDPOINT ==========
 app.get('/api/v1/health', (req, res) => {

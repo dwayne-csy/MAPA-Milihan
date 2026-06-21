@@ -12,7 +12,8 @@ const {
   firebaseGoogleAuth,
   firebaseFacebookAuth, 
   checkEmailVerification,
-  resendVerificationEmail
+  resendVerificationEmail,
+  getUserAvatar
 } = require('../controllers/User');
 
 const { isAuthenticatedUser } = require('../middlewares/auth');
@@ -40,5 +41,8 @@ router.put('/password/update', isAuthenticatedUser, updatePassword);
 // ========== USER PROFILE ROUTES ==========
 router.get('/me', isAuthenticatedUser, getUserProfile);
 router.put('/me/update', isAuthenticatedUser, upload.single('avatar'), updateProfile);
+
+// ========== USER AVATAR ROUTE ==========
+router.get('/:userId/avatar', getUserAvatar);
 
 module.exports = router;

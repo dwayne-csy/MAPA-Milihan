@@ -4,117 +4,126 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-// Helper: Upload files to Cloudinary using temp files
-const uploadFilesToCloudinaryWithTempFiles = async (files, folder = 'mapa-milihan/forum') => {
+// Helper: Upload files to Cloudinary using temp files - OPTIMIZED
+const uploadFilesToCloudinaryWithTempFiles = async (files, folder = 'Mapa-Milihan/forum') => {
   if (!files || files.length === 0) return [];
   
   console.log(`📤 Starting upload of ${files.length} files to Cloudinary folder: ${folder}`);
   
-  const uploadPromises = files.map(async (file) => {
-    let tempFilePath = null;
-    try {
-      let fileBuffer;
-      
-      if (file.path) {
-        console.log(`📁 Reading file from disk: ${file.path}`);
-        fileBuffer = fs.readFileSync(file.path);
-      } else if (file.buffer) {
-        fileBuffer = file.buffer;
-        console.log(`📁 Using file buffer for: ${file.originalname}`);
-      } else {
-        throw new Error('No file data available (neither path nor buffer)');
-      }
-      
-      const tempDir = path.join(os.tmpdir(), 'mapa_milihan_temp');
-      if (!fs.existsSync(tempDir)) {
-        fs.mkdirSync(tempDir, { recursive: true });
-      }
-      
-      const timestamp = Date.now();
-      const random = Math.random().toString(36).substring(2, 15);
-      const ext = path.extname(file.originalname) || '.jpg';
-      tempFilePath = path.join(tempDir, `forum-${timestamp}-${random}${ext}`);
-      
-      console.log(`📝 Writing temp file: ${tempFilePath}`);
-      console.log(`📝 File size: ${fileBuffer.length} bytes`);
-      
-      fs.writeFileSync(tempFilePath, fileBuffer);
-      
-      if (!fs.existsSync(tempFilePath)) {
-        throw new Error('Temp file was not created');
-      }
-      
-      const stats = fs.statSync(tempFilePath);
-      console.log(`📝 Temp file written: ${stats.size} bytes`);
-      
-      if (stats.size === 0) {
-        throw new Error('Temp file is empty');
-      }
-      
-      const isVideo = file.mimetype && file.mimetype.startsWith('video/');
-      console.log(`🎥 Is video: ${isVideo}`);
-      console.log(`📋 MIME type: ${file.mimetype}`);
-      
-      console.log(`☁️ Uploading to Cloudinary with type: ${isVideo ? 'video' : 'image'}...`);
-      
-      const result = await uploadToCloudinary(
-        tempFilePath, 
-        folder, 
-        isVideo ? 'video' : 'image'
-      );
-      
-      console.log(`✅ Uploaded to Cloudinary successfully: ${result.url}`);
-      console.log(`📋 Public ID: ${result.public_id}`);
-      console.log(`📋 Resource Type: ${result.resource_type}`);
-      
-      return {
-        url: result.url,
-        secure_url: result.url,
-        public_id: result.public_id,
-        mimetype: file.mimetype,
-        filename: result.public_id,
-        size: file.size || fileBuffer.length,
-        originalname: file.originalname,
-        format: file.mimetype ? file.mimetype.split('/')[1] : 'jpg',
-        resource_type: result.resource_type || (isVideo ? 'video' : 'image'),
-        type: isVideo ? 'video' : 'image'
-      };
-    } catch (error) {
-      console.error('❌ Error uploading to Cloudinary:', error);
-      console.error('Error details:', error.message);
-      if (tempFilePath) {
-        console.error('Temp file path:', tempFilePath);
-        try {
-          if (fs.existsSync(tempFilePath)) {
-            const stats = fs.statSync(tempFilePath);
-            console.error('Temp file exists, size:', stats.size);
-          }
-        } catch (e) {
-          console.error('Error checking temp file:', e);
-        }
-      }
-      return null;
-    } finally {
-      if (tempFilePath && fs.existsSync(tempFilePath)) {
-        try {
-          fs.unlinkSync(tempFilePath);
-          console.log(`🧹 Temp file deleted: ${tempFilePath}`);
-        } catch (unlinkError) {
-          console.error('Error deleting temp file:', unlinkError);
-        }
-      }
-      if (file.path && fs.existsSync(file.path)) {
-        try {
-          fs.unlinkSync(file.path);
-          console.log(`🧹 Original file deleted: ${file.path}`);
-        } catch (unlinkError) {
-          console.error('Error deleting original file:', unlinkError);
-        }
-      }
-    }
-  });
+  // Use Promise.all with concurrency limit to avoid overwhelming Cloudinary
+  const concurrencyLimit = 3;
+  const results = [];
   
-  const results = await Promise.all(uploadPromises);
+  for (let i = 0; i < files.length; i += concurrencyLimit) {
+    const chunk = files.slice(i, i + concurrencyLimit);
+    const chunkPromises = chunk.map(async (file) => {
+      let tempFilePath = null;
+      try {
+        let fileBuffer;
+        
+        if (file.path) {
+          console.log(`📁 Reading file from disk: ${file.path}`);
+          fileBuffer = fs.readFileSync(file.path);
+        } else if (file.buffer) {
+          fileBuffer = file.buffer;
+          console.log(`📁 Using file buffer for: ${file.originalname}`);
+        } else {
+          throw new Error('No file data available (neither path nor buffer)');
+        }
+        
+        const tempDir = path.join(os.tmpdir(), 'mapa_milihan_temp');
+        if (!fs.existsSync(tempDir)) {
+          fs.mkdirSync(tempDir, { recursive: true });
+        }
+        
+        const timestamp = Date.now();
+        const random = Math.random().toString(36).substring(2, 15);
+        const ext = path.extname(file.originalname) || '.jpg';
+        tempFilePath = path.join(tempDir, `forum-${timestamp}-${random}${ext}`);
+        
+        console.log(`📝 Writing temp file: ${tempFilePath}`);
+        console.log(`📝 File size: ${fileBuffer.length} bytes`);
+        
+        fs.writeFileSync(tempFilePath, fileBuffer);
+        
+        if (!fs.existsSync(tempFilePath)) {
+          throw new Error('Temp file was not created');
+        }
+        
+        const stats = fs.statSync(tempFilePath);
+        console.log(`📝 Temp file written: ${stats.size} bytes`);
+        
+        if (stats.size === 0) {
+          throw new Error('Temp file is empty');
+        }
+        
+        const isVideo = file.mimetype && file.mimetype.startsWith('video/');
+        console.log(`🎥 Is video: ${isVideo}`);
+        console.log(`📋 MIME type: ${file.mimetype}`);
+        
+        console.log(`☁️ Uploading to Cloudinary with type: ${isVideo ? 'video' : 'image'}...`);
+        
+        const result = await uploadToCloudinary(
+          tempFilePath, 
+          folder, 
+          isVideo ? 'video' : 'image'
+        );
+        
+        console.log(`✅ Uploaded to Cloudinary successfully: ${result.url}`);
+        console.log(`📋 Public ID: ${result.public_id}`);
+        console.log(`📋 Resource Type: ${result.resource_type}`);
+        
+        return {
+          url: result.url,
+          secure_url: result.url,
+          public_id: result.public_id,
+          mimetype: file.mimetype,
+          filename: result.public_id,
+          size: file.size || fileBuffer.length,
+          originalname: file.originalname,
+          format: file.mimetype ? file.mimetype.split('/')[1] : 'jpg',
+          resource_type: result.resource_type || (isVideo ? 'video' : 'image'),
+          type: isVideo ? 'video' : 'image'
+        };
+      } catch (error) {
+        console.error('❌ Error uploading to Cloudinary:', error);
+        console.error('Error details:', error.message);
+        if (tempFilePath) {
+          console.error('Temp file path:', tempFilePath);
+          try {
+            if (fs.existsSync(tempFilePath)) {
+              const stats = fs.statSync(tempFilePath);
+              console.error('Temp file exists, size:', stats.size);
+            }
+          } catch (e) {
+            console.error('Error checking temp file:', e);
+          }
+        }
+        return null;
+      } finally {
+        if (tempFilePath && fs.existsSync(tempFilePath)) {
+          try {
+            fs.unlinkSync(tempFilePath);
+            console.log(`🧹 Temp file deleted: ${tempFilePath}`);
+          } catch (unlinkError) {
+            console.error('Error deleting temp file:', unlinkError);
+          }
+        }
+        if (file.path && fs.existsSync(file.path)) {
+          try {
+            fs.unlinkSync(file.path);
+            console.log(`🧹 Original file deleted: ${file.path}`);
+          } catch (unlinkError) {
+            console.error('Error deleting original file:', unlinkError);
+          }
+        }
+      }
+    });
+    
+    const chunkResults = await Promise.all(chunkPromises);
+    results.push(...chunkResults);
+  }
+  
   const successfulUploads = results.filter(result => result !== null);
   console.log(`✅ Upload complete: ${successfulUploads.length}/${files.length} files uploaded successfully`);
   
@@ -378,7 +387,6 @@ exports.updatePost = async (req, res) => {
     }
 
     if (removeMediaIds && removeMediaIds.length > 0) {
-      // Handle both array and single string
       const idsToRemove = Array.isArray(removeMediaIds) ? removeMediaIds : [removeMediaIds];
       for (const publicId of idsToRemove) {
         const mediaToRemove = post.media.find(m => m.publicId === publicId);
@@ -411,7 +419,7 @@ exports.updatePost = async (req, res) => {
   }
 };
 
-// Delete post
+// Delete post - FIXED: Allow post owner to delete
 exports.deletePost = async (req, res) => {
   try {
     const postId = req.params.id;
@@ -427,7 +435,10 @@ exports.deletePost = async (req, res) => {
       });
     }
 
-    if (post.author.userId.toString() !== userId && userType !== 'Admin') {
+    const isPostOwner = post.author.userId.toString() === userId;
+    const isAdmin = userType === 'Admin';
+
+    if (!isPostOwner && !isAdmin) {
       return res.status(403).json({
         success: false,
         message: 'You are not authorized to delete this post'
@@ -516,7 +527,6 @@ exports.addComment = async (req, res) => {
     post.comments.push(comment);
     await post.save();
 
-    // Return the full post with all comments
     const updatedPost = await ForumPost.findById(postId).lean();
     
     res.status(201).json({
@@ -621,7 +631,7 @@ exports.updateComment = async (req, res) => {
   }
 };
 
-// Delete comment (post owner or comment owner can delete)
+// Delete comment - FIXED PERMISSIONS
 exports.deleteComment = async (req, res) => {
   try {
     const postId = req.params.id;
@@ -647,7 +657,6 @@ exports.deleteComment = async (req, res) => {
       });
     }
 
-    // Allow deletion if user is the post owner OR the comment author OR admin
     const isPostOwner = post.author.userId.toString() === userId;
     const isCommentAuthor = comment.author.userId.toString() === userId;
     const isAdmin = userType === 'Admin';

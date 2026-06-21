@@ -60,7 +60,7 @@ const FarmerHeader = () => {
   const navigationItems = [
     { label: 'Home', path: '/farmer/dashboard', icon: HomeIcon },
     { label: 'Products', path: '/farmer/productlist', icon: ShoppingBagIcon },
-    { label: 'Forums', path: '/farmer/forums', icon: ForumIcon },
+    { label: 'Forums', path: '/farmer/forum', icon: ForumIcon },
   ];
 
   const handleLogout = () => {
