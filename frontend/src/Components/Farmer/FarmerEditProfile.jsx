@@ -111,7 +111,9 @@ const EditProfile = () => {
     city: '',
     barangay: '',
     street: '',
-    zipcode: ''
+    zipcode: '',
+    lat: 0,
+    lng: 0
   });
   
   const [message, setMessage] = useState({ type: '', text: '' });
@@ -213,17 +215,23 @@ const EditProfile = () => {
   const applyDetectedLocation = () => {
     if (detailedLocation && detailedLocation.components) {
       const c = detailedLocation.components;
+      const lat = userLocation?.lat || 0;
+      const lng = userLocation?.lng || 0;
+      
       setFormData({
         ...formData,
         street: c.road || formData.street,
         barangay: c.neighbourhood || c.suburb || formData.barangay,
         city: c.city || c.town || c.village || formData.city,
-        zipcode: c.postcode || formData.zipcode
+        zipcode: c.postcode || formData.zipcode,
+        lat: lat,
+        lng: lng
       });
+      
       setShowLocationModal(false);
       setMessage({ 
         type: 'success', 
-        text: 'Location applied to your profile! Click Save to update.' 
+        text: `Location applied! ${lat && lng ? 'Coordinates saved.' : ''} Click Save to update.` 
       });
       setTimeout(() => {
         setMessage({ type: '', text: '' });
@@ -260,7 +268,9 @@ const EditProfile = () => {
           city: data.user.address?.city || '',
           barangay: data.user.address?.barangay || '',
           street: data.user.address?.street || '',
-          zipcode: data.user.address?.zipcode || data.user.address?.zipCode || ''
+          zipcode: data.user.address?.zipcode || data.user.address?.zipCode || '',
+          lat: data.user.address?.lat || data.user.lat || 0,
+          lng: data.user.address?.lng || data.user.lng || 0
         });
         // Set avatar preview if exists
         if (data.user.avatar?.url || data.user.profilePicture?.url) {
@@ -329,6 +339,12 @@ const EditProfile = () => {
     formDataToSend.append('barangay', formData.barangay.trim());
     formDataToSend.append('street', formData.street.trim());
     formDataToSend.append('zipcode', formData.zipcode.trim());
+    
+    // Add coordinates if available
+    if (formData.lat && formData.lng) {
+      formDataToSend.append('lat', formData.lat);
+      formDataToSend.append('lng', formData.lng);
+    }
 
     // Append avatar if changed
     if (avatarFile) {
@@ -1146,20 +1162,42 @@ const EditProfile = () => {
                     />
                   </div>
 
+                  {/* Show coordinates if available */}
+                  {formData.lat !== 0 && formData.lng !== 0 && (
+                    <div className="ep-location-detect" style={{ background: '#e8f5e9', borderColor: '#43A047' }}>
+                      <MapPinIcon size={18} color="#2E7D32" />
+                      <p style={{ fontSize: '0.8rem' }}>
+                        <span className="highlight">✓ Location coordinates saved</span><br />
+                        <span style={{ fontSize: '0.7rem', color: '#78909c' }}>
+                          Lat: {formData.lat.toFixed(6)}, Lng: {formData.lng.toFixed(6)}
+                        </span>
+                      </p>
+                      <button
+                        type="button"
+                        className="ep-detect-btn"
+                        onClick={() => { setShowLocationModal(true); detectCurrentLocation(); }}
+                      >
+                        <RefreshIcon size={14} /> Update
+                      </button>
+                    </div>
+                  )}
+
                   {/* ── Detect Location ── */}
-                  <div className="ep-location-detect">
-                    <MapPinIcon size={18} color="#2E7D32" />
-                    <p>
-                      Use <span className="highlight">GPS</span> to automatically fill your address
-                    </p>
-                    <button
-                      type="button"
-                      className="ep-detect-btn"
-                      onClick={() => { setShowLocationModal(true); detectCurrentLocation(); }}
-                    >
-                      <NavigationIcon size={16} /> Detect
-                    </button>
-                  </div>
+                  {(formData.lat === 0 || formData.lng === 0) && (
+                    <div className="ep-location-detect">
+                      <MapPinIcon size={18} color="#2E7D32" />
+                      <p>
+                        Use <span className="highlight">GPS</span> to automatically fill your address and save coordinates
+                      </p>
+                      <button
+                        type="button"
+                        className="ep-detect-btn"
+                        onClick={() => { setShowLocationModal(true); detectCurrentLocation(); }}
+                      >
+                        <NavigationIcon size={16} /> Detect
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* ── Actions ── */}
