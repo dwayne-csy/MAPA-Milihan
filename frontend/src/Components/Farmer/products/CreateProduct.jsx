@@ -263,7 +263,7 @@ const CreateProduct = () => {
   };
 
   return (
-    <>
+    <div className="full-bleed w-full min-h-screen bg-[#f5f7f5] flex flex-col">
       <FarmerHeader />
 
       <style>{`
@@ -285,15 +285,16 @@ const CreateProduct = () => {
 
         .cp-root {
           font-family: 'DM Sans', sans-serif;
-          min-height: 100vh;
-          background: #f5f7f5;
-          padding-top: 80px;
+          flex: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 32px 20px;
         }
 
         .cp-container {
           max-width: 820px;
-          margin: 0 auto;
-          padding: 32px 20px 60px;
+          width: 100%;
         }
 
         .cp-card {
@@ -718,6 +719,7 @@ const CreateProduct = () => {
           .cp-location-bar { flex-direction: column; align-items: stretch; }
           .cp-header { flex-direction: column; align-items: flex-start; }
           .cp-media-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+          .cp-root { padding: 16px; }
         }
       `}</style>
 
@@ -956,7 +958,7 @@ const CreateProduct = () => {
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 };
 

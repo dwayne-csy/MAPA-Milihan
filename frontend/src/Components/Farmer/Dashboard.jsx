@@ -3,13 +3,10 @@ import FarmerHeader from '../layouts/FarmerHeader';
 
 const Dashboard = () => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100">
-      {/* Farmer Header */}
+    <div className="full-bleed w-full min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex flex-col">
       <FarmerHeader />
-
-      {/* Main Content */}
-      <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
-        <div className="text-center">
+      <div className="flex-1 flex items-center justify-center">
+        <div className="text-center px-4">
           <h1 className="text-5xl font-bold text-green-800 mb-4">
             🌾 Welcome Farmers!
           </h1>

@@ -230,89 +230,41 @@ const ViewProduct = () => {
   // ── Loading State ──
   if (loading) {
     return (
-      <>
+      <div className="full-bleed w-full min-h-screen bg-[#f5f7f5] flex flex-col">
         <FarmerHeader />
-        <style>{`
-          @keyframes vp-spin { to { transform: rotate(360deg); } }
-        `}</style>
-        <div style={{
-          minHeight: '100vh',
-          background: '#f5f7f5',
-          paddingTop: '80px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{
-              width: '48px',
-              height: '48px',
-              border: '4px solid #c8e6c9',
-              borderTopColor: '#2E7D32',
-              borderRadius: '50%',
-              animation: 'vp-spin 0.9s linear infinite',
-              margin: '0 auto 16px'
-            }} />
-            <p style={{ color: '#546e7a', fontFamily: "'DM Sans', sans-serif", fontSize: '0.95rem' }}>
-              Loading product details...
-            </p>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-12 h-12 border-4 border-[#c8e6c9] border-t-[#2E7D32] rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-[#546e7a] font-['DM_Sans'] text-sm">Loading product details...</p>
           </div>
         </div>
-      </>
+      </div>
     );
   }
 
   // ── Error State ──
   if (error || !product) {
     return (
-      <>
+      <div className="full-bleed w-full min-h-screen bg-[#f5f7f5] flex flex-col">
         <FarmerHeader />
-        <div style={{
-          minHeight: '100vh',
-          background: '#f5f7f5',
-          paddingTop: '80px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
-          <div style={{
-            textAlign: 'center',
-            background: '#fff',
-            padding: '40px',
-            borderRadius: '16px',
-            maxWidth: '400px',
-            border: '1px solid #ffebee'
-          }}>
-            <AlertTriangleIcon size={48} style={{ color: '#ef5350' }} />
-            <h3 style={{ color: '#c62828', margin: '16px 0 8px' }}>
+        <div className="flex-1 flex items-center justify-center px-4">
+          <div className="bg-white rounded-2xl p-10 max-w-md w-full text-center border border-red-100 shadow-lg">
+            <AlertTriangleIcon size={48} className="text-red-500 mx-auto" />
+            <h3 className="text-red-700 text-xl font-bold mt-4 mb-2">
               {error || 'Product not found'}
             </h3>
-            <p style={{ color: '#78909c' }}>
+            <p className="text-gray-500 text-sm">
               The product you're looking for might have been removed or is no longer available.
             </p>
             <button
               onClick={handleGoBack}
-              style={{
-                marginTop: '20px',
-                padding: '10px 28px',
-                background: 'linear-gradient(135deg, #2E7D32, #43A047)',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '8px',
-                fontFamily: "'DM Sans', sans-serif",
-                fontSize: '0.9rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                transition: 'opacity 0.2s'
-              }}
-              onMouseEnter={(e) => e.target.style.opacity = '0.85'}
-              onMouseLeave={(e) => e.target.style.opacity = '1'}
+              className="mt-6 px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition-colors"
             >
               Back to Products
             </button>
           </div>
         </div>
-      </>
+      </div>
     );
   }
 
@@ -320,7 +272,7 @@ const ViewProduct = () => {
   const stockStatus = getStockStatus(Number(product.quantity) || 0);
 
   return (
-    <>
+    <div className="full-bleed w-full min-h-screen bg-[#f5f7f5] flex flex-col">
       <FarmerHeader />
 
       <style>{`
@@ -342,15 +294,13 @@ const ViewProduct = () => {
 
         .vp-root {
           font-family: 'DM Sans', sans-serif;
-          min-height: 100vh;
-          background: #f5f7f5;
-          padding-top: 80px;
+          flex: 1;
+          padding: 32px 20px;
         }
 
         .vp-container {
           max-width: 1200px;
           margin: 0 auto;
-          padding: 32px 20px 60px;
         }
 
         .vp-header-actions {
@@ -878,6 +828,7 @@ const ViewProduct = () => {
           transition: border-color 0.2s, transform 0.2s;
           flex-shrink: 0;
           background: #e8f5e9;
+          position: relative;
         }
 
         .vp-thumbnail-item:hover {
@@ -982,6 +933,9 @@ const ViewProduct = () => {
           .vp-thumbnail-item {
             width: 44px;
             height: 44px;
+          }
+          .vp-root {
+            padding: 16px;
           }
         }
       `}</style>
@@ -1239,7 +1193,7 @@ const ViewProduct = () => {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 };
 

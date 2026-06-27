@@ -3,12 +3,11 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import EditIcon from '@mui/icons-material/Edit';
 import LogoutIcon from '@mui/icons-material/Logout';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import HomeIcon from '@mui/icons-material/Home';
-import ShoppingBagIcon from '@mui/icons-material/ShoppingBag';
-import ForumIcon from '@mui/icons-material/Forum';
 import MenuIcon from '@mui/icons-material/Menu';
 import CloseIcon from '@mui/icons-material/Close';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import ShoppingBagIcon from '@mui/icons-material/ShoppingBag';
+import AssignmentIcon from '@mui/icons-material/Assignment';
 
 const FarmerHeader = () => {
   const [user, setUser] = useState(null);
@@ -58,9 +57,9 @@ const FarmerHeader = () => {
   const toggleMobileMenu = () => setMobileMenuOpen(!mobileMenuOpen);
 
   const navigationItems = [
-    { label: 'Home', path: '/farmer/dashboard', icon: HomeIcon },
-    { label: 'Products', path: '/farmer/productlist', icon: ShoppingBagIcon },
-    { label: 'Forums', path: '/farmer/forum', icon: ForumIcon },
+    { label: 'Home', path: '/farmer/dashboard' },
+    { label: 'Products', path: '/farmer/productlist' },
+    { label: 'Forums', path: '/farmer/forum' },
   ];
 
   const handleLogout = () => {
@@ -70,6 +69,11 @@ const FarmerHeader = () => {
   };
 
   const dropdownItems = [
+    { 
+      label: 'Manage Orders', 
+      icon: AssignmentIcon, 
+      action: () => navigate('/farmer/orders')
+    },
     { 
       label: 'Edit Profile', 
       icon: EditIcon, 
@@ -202,7 +206,6 @@ const FarmerHeader = () => {
         .nav-link {
           display: flex;
           align-items: center;
-          gap: 0.5rem;
           color: rgba(255, 255, 255, 0.85);
           font-weight: 500;
           cursor: pointer;
@@ -211,13 +214,6 @@ const FarmerHeader = () => {
           transition: all 0.3s ease;
           font-size: 0.95rem;
           position: relative;
-        }
-
-        .nav-link .nav-icon {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 1.2rem;
         }
 
         .nav-link:hover {
@@ -422,7 +418,6 @@ const FarmerHeader = () => {
         .mobile-nav-link {
           display: flex;
           align-items: center;
-          gap: 0.75rem;
           color: rgba(255, 255, 255, 0.85);
           padding: 14px 2rem;
           font-weight: 500;
@@ -440,13 +435,6 @@ const FarmerHeader = () => {
           background: rgba(255, 255, 255, 0.12);
           color: white;
           font-weight: 600;
-        }
-
-        .mobile-nav-link .nav-icon {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 1.3rem;
         }
 
         /* Mobile Dropdown Items */
@@ -499,10 +487,6 @@ const FarmerHeader = () => {
           .nav-link {
             padding: 6px 12px;
             font-size: 0.85rem;
-          }
-
-          .nav-link .nav-label {
-            display: none;
           }
         }
 
@@ -597,21 +581,15 @@ const FarmerHeader = () => {
 
           {/* Navigation Links - Desktop */}
           <nav className="nav-links">
-            {navigationItems.map((item, i) => {
-              const IconComponent = item.icon;
-              return (
-                <div
-                  key={i}
-                  className={`nav-link ${isNavActive(item.path) ? 'active' : ''}`}
-                  onClick={() => navigate(item.path)}
-                >
-                  <span className="nav-icon">
-                    <IconComponent sx={{ fontSize: '1.2rem' }} />
-                  </span>
-                  <span className="nav-label">{item.label}</span>
-                </div>
-              );
-            })}
+            {navigationItems.map((item, i) => (
+              <div
+                key={i}
+                className={`nav-link ${isNavActive(item.path) ? 'active' : ''}`}
+                onClick={() => navigate(item.path)}
+              >
+                {item.label}
+              </div>
+            ))}
           </nav>
 
           {/* User Profile Dropdown Section */}
@@ -672,24 +650,18 @@ const FarmerHeader = () => {
 
         {/* Mobile Navigation */}
         <div className={`mobile-nav ${mobileMenuOpen ? 'open' : ''}`}>
-          {navigationItems.map((item, i) => {
-            const IconComponent = item.icon;
-            return (
-              <div
-                key={i}
-                className={`mobile-nav-link ${isNavActive(item.path) ? 'active' : ''}`}
-                onClick={() => {
-                  navigate(item.path);
-                  setMobileMenuOpen(false);
-                }}
-              >
-                <span className="nav-icon">
-                  <IconComponent sx={{ fontSize: '1.3rem' }} />
-                </span>
-                <span>{item.label}</span>
-              </div>
-            );
-          })}
+          {navigationItems.map((item, i) => (
+            <div
+              key={i}
+              className={`mobile-nav-link ${isNavActive(item.path) ? 'active' : ''}`}
+              onClick={() => {
+                navigate(item.path);
+                setMobileMenuOpen(false);
+              }}
+            >
+              {item.label}
+            </div>
+          ))}
           
           <div className="mobile-divider"></div>
           

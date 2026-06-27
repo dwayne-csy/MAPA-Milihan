@@ -201,40 +201,20 @@ const ProductList = () => {
 
   if (loading) {
     return (
-      <>
+      <div className="full-bleed w-full min-h-screen bg-[#f5f7f5] flex flex-col">
         <FarmerHeader />
-        <style>{`
-          @keyframes pl-spin { to { transform: rotate(360deg); } }
-        `}</style>
-        <div style={{
-          minHeight: '100vh',
-          background: '#f5f7f5',
-          paddingTop: '80px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{
-              width: '48px',
-              height: '48px',
-              border: '4px solid #c8e6c9',
-              borderTopColor: '#2E7D32',
-              borderRadius: '50%',
-              animation: 'pl-spin 0.9s linear infinite',
-              margin: '0 auto 16px'
-            }} />
-            <p style={{ color: '#546e7a', fontFamily: "'DM Sans', sans-serif", fontSize: '0.95rem' }}>
-              Loading your products...
-            </p>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-12 h-12 border-4 border-[#c8e6c9] border-t-[#2E7D32] rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-[#546e7a] font-['DM_Sans'] text-sm">Loading your products...</p>
           </div>
         </div>
-      </>
+      </div>
     );
   }
 
   return (
-    <>
+    <div className="full-bleed w-full min-h-screen bg-[#f5f7f5] flex flex-col">
       <FarmerHeader />
 
       <style>{`
@@ -251,15 +231,13 @@ const ProductList = () => {
 
         .pl-root {
           font-family: 'DM Sans', sans-serif;
-          min-height: 100vh;
-          background: #f5f7f5;
-          padding-top: 80px;
+          flex: 1;
+          padding: 32px 20px;
         }
 
         .pl-container {
           max-width: 1200px;
           margin: 0 auto;
-          padding: 32px 20px 60px;
         }
 
         .pl-header {
@@ -727,6 +705,7 @@ const ProductList = () => {
           .pl-grid { grid-template-columns: 1fr; }
           .pl-product-actions { flex-wrap: wrap; }
           .pl-action-btn { flex: 1; min-width: 80px; }
+          .pl-root { padding: 16px; }
         }
       `}</style>
 
@@ -909,7 +888,7 @@ const ProductList = () => {
           )}
         </div>
       </div>
-    </>
+    </div>
   );
 };
 
