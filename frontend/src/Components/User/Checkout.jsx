@@ -31,6 +31,19 @@ const XIcon = ({ size = 20 }) => (
   </svg>
 );
 
+const PlusIcon = ({ size = 20 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="5" x2="12" y2="19"/>
+    <line x1="5" y1="12" x2="19" y2="12"/>
+  </svg>
+);
+
+const MinusIcon = ({ size = 20 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="5" y1="12" x2="19" y2="12"/>
+  </svg>
+);
+
 const Checkout = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -58,6 +71,36 @@ const Checkout = () => {
       navigate('/cart');
     }
   }, [location, navigate]);
+
+  // ── Quantity Handlers ──
+  const handleIncreaseQuantity = () => {
+    if (isSoloCheckout && soloProduct) {
+      const maxQuantity = soloProduct.stock || 99;
+      if (soloQuantity < maxQuantity) {
+        setSoloQuantity(prev => prev + 1);
+      }
+    }
+  };
+
+  const handleDecreaseQuantity = () => {
+    if (isSoloCheckout && soloProduct) {
+      if (soloQuantity > 1) {
+        setSoloQuantity(prev => prev - 1);
+      }
+    }
+  };
+
+  const handleQuantityChange = (e) => {
+    if (isSoloCheckout && soloProduct) {
+      const value = parseInt(e.target.value);
+      if (!isNaN(value) && value >= 1) {
+        const maxQuantity = soloProduct.stock || 99;
+        if (value <= maxQuantity) {
+          setSoloQuantity(value);
+        }
+      }
+    }
+  };
 
   const handlePlaceOrder = async () => {
     setLoading(true);
@@ -388,6 +431,76 @@ const Checkout = () => {
           color: #2E7D32;
         }
 
+        /* ── Quantity Controls ── */
+        .quantity-controls {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-top: 4px;
+        }
+
+        .quantity-btn {
+          width: 28px;
+          height: 28px;
+          border: 1.5px solid #e0e7e0;
+          border-radius: 6px;
+          background: #f8faf8;
+          color: #2d3748;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s;
+          font-size: 1rem;
+          font-weight: 600;
+          padding: 0;
+        }
+
+        .quantity-btn:hover:not(:disabled) {
+          background: #e8f5e9;
+          border-color: #66BB6A;
+          color: #2E7D32;
+        }
+
+        .quantity-btn:disabled {
+          opacity: 0.3;
+          cursor: not-allowed;
+        }
+
+        .quantity-input {
+          width: 48px;
+          height: 28px;
+          text-align: center;
+          border: 1.5px solid #e0e7e0;
+          border-radius: 6px;
+          font-size: 0.9rem;
+          font-weight: 500;
+          color: #2d3748;
+          background: white;
+          outline: none;
+          transition: border-color 0.2s;
+        }
+
+        .quantity-input:focus {
+          border-color: #66BB6A;
+        }
+
+        .quantity-input::-webkit-inner-spin-button,
+        .quantity-input::-webkit-outer-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+
+        .quantity-input {
+          -moz-appearance: textfield;
+        }
+
+        .stock-info {
+          font-size: 0.7rem;
+          color: #94a3b8;
+          margin-top: 2px;
+        }
+
         @media (max-width: 640px) {
           .checkout-actions {
             flex-direction: column-reverse;
@@ -395,6 +508,21 @@ const Checkout = () => {
           .checkout-actions .place-order-btn,
           .checkout-actions .cancel-order-btn {
             flex: 1;
+          }
+          
+          .quantity-controls {
+            gap: 6px;
+          }
+          
+          .quantity-btn {
+            width: 24px;
+            height: 24px;
+          }
+          
+          .quantity-input {
+            width: 40px;
+            height: 24px;
+            font-size: 0.8rem;
           }
         }
       `}</style>
@@ -470,8 +598,52 @@ const Checkout = () => {
                 </div>
                 <div className="flex-1">
                   <p className="font-medium">{item.product.name}</p>
+                  
+                  {/* ── Quantity Controls (only for solo checkout) ── */}
+                  {isSoloCheckout && soloProduct && (
+                    <div className="quantity-controls">
+                      <button 
+                        className="quantity-btn"
+                        onClick={handleDecreaseQuantity}
+                        disabled={soloQuantity <= 1}
+                        aria-label="Decrease quantity"
+                      >
+                        <MinusIcon size={14} />
+                      </button>
+                      <input
+                        type="number"
+                        className="quantity-input"
+                        value={soloQuantity}
+                        onChange={handleQuantityChange}
+                        min="1"
+                        max={soloProduct.stock || 99}
+                        aria-label="Quantity"
+                      />
+                      <button 
+                        className="quantity-btn"
+                        onClick={handleIncreaseQuantity}
+                        disabled={soloQuantity >= (soloProduct.stock || 99)}
+                        aria-label="Increase quantity"
+                      >
+                        <PlusIcon size={14} />
+                      </button>
+                      {soloProduct.stock && (
+                        <span className="stock-info">
+                          Stock: {soloProduct.stock}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* ── Show quantity for cart items (non-editable) ── */}
+                  {!isSoloCheckout && (
+                    <p className="text-sm text-gray-500">
+                      Quantity: {item.quantity}
+                    </p>
+                  )}
+                  
                   <p className="text-sm text-gray-500">
-                    {item.quantity} × ₱{Number(item.product.price).toFixed(2)}
+                    ₱{Number(item.product.price).toFixed(2)} per item
                   </p>
                   {item.product.unit && (
                     <p className="text-xs text-gray-400">Unit: {item.product.unit}</p>

@@ -26,6 +26,8 @@ import Checkout from './Components/User/Checkout';
 import CheckoutConfirmation from './Components/User/CheckoutConfirmation';
 import OrderHistory from './Components/User/OrderHistory';
 import OrderDetails from './Components/User/OrderDetails';
+import OrderList from './Components/Farmer/orders/OrderList';
+import ViewOrder from './Components/Farmer/orders/ViewOrder';
 
 const App = () => {
   const token = isAuthenticated();
@@ -64,7 +66,6 @@ const App = () => {
         <Route path="/orders" element={<OrderHistory />} />
         <Route path="/orders/:orderId" element={<OrderDetails />} />
         
-        
         {/* Farmer Protected Routes */}
         <Route path="/farmer/dashboard" element={<ProtectedRoute requiredRole="farmer"><Dashboard /></ProtectedRoute>} />
         <Route path="/farmer/productlist" element={<ProtectedRoute requiredRole="farmer"><ProductList /></ProtectedRoute>} />
@@ -73,6 +74,9 @@ const App = () => {
         <Route path="/farmer/edit-profile" element={<ProtectedRoute requiredRole="farmer"><FarmerEditProfile /></ProtectedRoute>} />
         <Route path="/farmer/view-product/:id" element={<ProtectedRoute requiredRole="farmer"><ViewProduct /></ProtectedRoute>} />
         <Route path="/farmer/forum" element={<ProtectedRoute requiredRole="farmer"><FarmerForum /></ProtectedRoute>} />
+        {/* ORDER ROUTES - Updated to match component navigation */}
+        <Route path="/farmer/orderlist" element={<ProtectedRoute requiredRole="farmer"><OrderList /></ProtectedRoute>} />
+        <Route path="/farmer/order/:id" element={<ProtectedRoute requiredRole="farmer"><ViewOrder /></ProtectedRoute>} />
 
         {/* Admin Protected Routes */}
         <Route path="/admin/dashboard" element={<ProtectedRoute requiredRole="admin"><AdminDashboard /></ProtectedRoute>} />

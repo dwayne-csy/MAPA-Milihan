@@ -22,6 +22,7 @@ const forumRoutes = require('./routes/Forum');
 const uploadRoutes = require('./routes/uploadRoutes');
 const cartRoutes = require('./routes/Cart');
 const orderRoutes = require('./routes/Order');
+const manageOrderRoutes = require('./routes/ManageOrder');
 
 // Use routes
 app.use('/api/v1/users', userRoutes);
@@ -31,6 +32,7 @@ app.use('/api/forums', forumRoutes);
 app.use('/api/v1/upload', uploadRoutes);
 app.use('/api/v1', cartRoutes);
 app.use('/api/v1', orderRoutes);
+app.use('/api/v1/manage-orders', manageOrderRoutes);
 
 // ========== HEALTH CHECK ENDPOINT ==========
 app.get('/api/v1/health', (req, res) => {

@@ -8,6 +8,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import ShoppingBagIcon from '@mui/icons-material/ShoppingBag';
 import AssignmentIcon from '@mui/icons-material/Assignment';
+import MessageIcon from '@mui/icons-material/Message'; // Add this import
 
 const FarmerHeader = () => {
   const [user, setUser] = useState(null);
@@ -68,11 +69,20 @@ const FarmerHeader = () => {
     navigate('/login');
   };
 
+  const handleMessage = () => {
+    navigate('/farner/messages'); // Adjust the path as needed
+  };
+
   const dropdownItems = [
     { 
       label: 'Manage Orders', 
       icon: AssignmentIcon, 
-      action: () => navigate('/farmer/orders')
+      action: () => navigate('/farmer/orderlist')
+    },
+    { 
+      label: 'Messages', // Added Message button
+      icon: MessageIcon,
+      action: handleMessage
     },
     { 
       label: 'Edit Profile', 

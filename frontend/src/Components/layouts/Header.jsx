@@ -5,6 +5,7 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import HistoryIcon from '@mui/icons-material/History';
+import MessageIcon from '@mui/icons-material/Message'; // Add this import
 import Badge from '@mui/material/Badge';
 import logo from '../logo/logo.png';
 
@@ -114,11 +115,21 @@ const Header = () => {
     setProfileMenuOpen(false);
   };
 
+  const handleMessages = () => {
+    navigate('/messages'); // Adjust the path as needed
+    setProfileMenuOpen(false);
+  };
+
   const profileMenuItems = [
     { 
       label: 'Order History', 
       icon: HistoryIcon, 
       action: handleOrderHistory
+    },
+    { 
+      label: 'Messages', // Added Messages button
+      icon: MessageIcon,
+      action: handleMessages
     },
     { 
       label: 'Edit Profile', 
