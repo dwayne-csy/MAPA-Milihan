@@ -21,6 +21,11 @@ import ViewProduct from "./Components/Farmer/products/ViewProduct";
 import Maps from "./Components/User/Maps";
 import Forum from "./Components/User/Forum";
 import FarmerForum from "./Components/Farmer/FarmerForum";
+import Cart from "./Components/User/Cart";
+import Checkout from './Components/User/Checkout';
+import CheckoutConfirmation from './Components/User/CheckoutConfirmation';
+import OrderHistory from './Components/User/OrderHistory';
+import OrderDetails from './Components/User/OrderDetails';
 
 const App = () => {
   const token = isAuthenticated();
@@ -53,6 +58,12 @@ const App = () => {
         <Route path="/product/:id" element={<ProtectedRoute requiredRole="user"><ProductDetails /></ProtectedRoute>} />
         <Route path="/maps" element={<ProtectedRoute requiredRole="user"><Maps /></ProtectedRoute>} />
         <Route path="/forum" element={<ProtectedRoute requiredRole="user"><Forum /></ProtectedRoute>} />
+        <Route path="/cart" element={<ProtectedRoute requiredRole="user"><Cart /></ProtectedRoute>} />
+        <Route path="/checkout" element={<Checkout />} />
+        <Route path="/checkout/confirmation" element={<CheckoutConfirmation />} />
+        <Route path="/orders" element={<OrderHistory />} />
+        <Route path="/orders/:orderId" element={<OrderDetails />} />
+        
         
         {/* Farmer Protected Routes */}
         <Route path="/farmer/dashboard" element={<ProtectedRoute requiredRole="farmer"><Dashboard /></ProtectedRoute>} />

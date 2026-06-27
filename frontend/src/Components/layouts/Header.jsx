@@ -3,6 +3,9 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import EditIcon from '@mui/icons-material/Edit';
 import LogoutIcon from '@mui/icons-material/Logout';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
+import HistoryIcon from '@mui/icons-material/History';
+import Badge from '@mui/material/Badge';
 import logo from '../logo/logo.png';
 
 const Header = () => {
@@ -11,6 +14,7 @@ const Header = () => {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [logoError, setLogoError] = useState(false);
+  const [cartCount, setCartCount] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -35,6 +39,8 @@ const Header = () => {
 
         if (response.ok && data.user) {
           setUser(data.user);
+          // Fetch cart count after user is loaded
+          fetchCartCount();
         } else {
           localStorage.removeItem('token');
           localStorage.removeItem('user');
@@ -55,6 +61,34 @@ const Header = () => {
     fetchUserData();
   }, [navigate, API_BASE_URL]);
 
+  const fetchCartCount = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      const response = await fetch(`${API_BASE_URL}/api/v1/cart/count`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setCartCount(data.count || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching cart count:', error);
+    }
+  };
+
+  // Refresh cart count when navigating to cart or product pages
+  useEffect(() => {
+    if (location.pathname === '/cart' || location.pathname === '/product') {
+      fetchCartCount();
+    }
+  }, [location.pathname]);
+
   const toggleProfileMenu = () => setProfileMenuOpen(!profileMenuOpen);
   const toggleMobileMenu = () => setMobileMenuOpen(!mobileMenuOpen);
 
@@ -71,7 +105,21 @@ const Header = () => {
     navigate('/login');
   };
 
+  const handleCartClick = () => {
+    navigate('/cart');
+  };
+
+  const handleOrderHistory = () => {
+    navigate('/orders');
+    setProfileMenuOpen(false);
+  };
+
   const profileMenuItems = [
+    { 
+      label: 'Order History', 
+      icon: HistoryIcon, 
+      action: handleOrderHistory
+    },
     { 
       label: 'Edit Profile', 
       icon: EditIcon, 
@@ -226,6 +274,50 @@ const Header = () => {
           border-radius: 2px;
         }
 
+        /* Cart Button */
+        .cart-btn {
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 8px;
+          border-radius: 50%;
+          color: rgba(255, 255, 255, 0.85);
+          transition: all 0.3s ease;
+          background: rgba(255, 255, 255, 0.08);
+          margin-right: 0.5rem;
+        }
+
+        .cart-btn:hover {
+          background: rgba(255, 255, 255, 0.2);
+          transform: translateY(-2px);
+          color: white;
+        }
+
+        .cart-btn .cart-icon {
+          width: 24px;
+          height: 24px;
+        }
+
+        .cart-badge {
+          position: absolute;
+          top: -4px;
+          right: -4px;
+          background: #ef4444;
+          color: white;
+          font-size: 0.6rem;
+          font-weight: 700;
+          min-width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 4px;
+          box-shadow: 0 2px 6px rgba(239, 68, 68, 0.4);
+          border: 2px solid #059669;
+        }
+
         .profile-dropdown {
           position: relative;
         }
@@ -363,7 +455,7 @@ const Header = () => {
         .user-section {
           display: flex;
           align-items: center;
-          gap: 0.75rem;
+          gap: 0.5rem;
         }
 
         /* Mobile Menu Button */
@@ -424,6 +516,42 @@ const Header = () => {
           font-weight: 600;
         }
 
+        /* Mobile Cart Link */
+        .mobile-cart-link {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          color: rgba(255, 255, 255, 0.85);
+          padding: 14px 2rem;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+          text-align: center;
+          font-size: 1rem;
+          letter-spacing: 0.5px;
+        }
+
+        .mobile-cart-link:hover {
+          background: rgba(255, 255, 255, 0.08);
+          color: white;
+        }
+
+        .mobile-cart-link .cart-badge-mobile {
+          background: #ef4444;
+          color: white;
+          font-size: 0.65rem;
+          font-weight: 700;
+          min-width: 20px;
+          height: 20px;
+          border-radius: 50%;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 4px;
+        }
+
         @media (max-width: 1024px) {
           .nav-links {
             gap: 0.25rem;
@@ -477,6 +605,23 @@ const Header = () => {
             height: 30px;
             font-size: 0.7rem;
           }
+
+          .cart-btn {
+            padding: 6px;
+          }
+
+          .cart-btn .cart-icon {
+            width: 20px;
+            height: 20px;
+          }
+
+          .cart-badge {
+            min-width: 16px;
+            height: 16px;
+            font-size: 0.5rem;
+            top: -3px;
+            right: -3px;
+          }
         }
 
         @media (max-width: 480px) {
@@ -493,7 +638,8 @@ const Header = () => {
             height: 55px;
           }
 
-          .mobile-nav-link {
+          .mobile-nav-link,
+          .mobile-cart-link {
             padding: 12px 1.5rem;
             font-size: 0.9rem;
           }
@@ -532,6 +678,14 @@ const Header = () => {
 
           {/* User Profile Section */}
           <div className="user-section">
+            {/* Cart Button */}
+            <button className="cart-btn" onClick={handleCartClick} title="View Cart">
+              <ShoppingCartIcon className="cart-icon" />
+              {cartCount > 0 && (
+                <span className="cart-badge">{cartCount > 99 ? '99+' : cartCount}</span>
+              )}
+            </button>
+
             <div className="profile-dropdown">
               <button className="profile-trigger" onClick={toggleProfileMenu}>
                 <div className="user-avatar">
@@ -596,6 +750,20 @@ const Header = () => {
               {item.label}
             </div>
           ))}
+          {/* Mobile Cart Link */}
+          <div
+            className="mobile-cart-link"
+            onClick={() => {
+              navigate('/cart');
+              setMobileMenuOpen(false);
+            }}
+          >
+            <ShoppingCartIcon style={{ width: '20px', height: '20px' }} />
+            Cart
+            {cartCount > 0 && (
+              <span className="cart-badge-mobile">{cartCount > 99 ? '99+' : cartCount}</span>
+            )}
+          </div>
         </div>
       </header>
     </>

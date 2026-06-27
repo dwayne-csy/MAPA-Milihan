@@ -31,6 +31,16 @@ const ShoppingCartIcon = ({ size = 18 }) => (
   </svg>
 );
 
+const CartPlusIcon = ({ size = 18 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="9" cy="21" r="1"/>
+    <circle cx="20" cy="21" r="1"/>
+    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+    <line x1="10" y1="11" x2="10" y2="17"/>
+    <line x1="7" y1="14" x2="13" y2="14"/>
+  </svg>
+);
+
 const ClockIcon = ({ size = 16 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="10"/>
@@ -115,6 +125,7 @@ const ProductDetails = () => {
   const [error, setError] = useState('');
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [addingToCart, setAddingToCart] = useState(false);
   const videoRef = useRef(null);
 
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001';
@@ -188,7 +199,78 @@ const ProductDetails = () => {
     }
   };
 
+  const handleAddToCart = async () => {
+    // Check if user is logged in
+    const token = localStorage.getItem('token');
+    if (!token) {
+      if (window.confirm('Please login to add items to cart. Go to login?')) {
+        navigate('/login');
+      }
+      return;
+    }
+
+    setAddingToCart(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/cart/add`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ productId: product._id, quantity: 1 })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Show success message
+        const toast = document.createElement('div');
+        toast.style.cssText = `
+          position: fixed;
+          top: 100px;
+          right: 20px;
+          background: #e8f5e9;
+          color: #1b5e20;
+          padding: 14px 24px;
+          border-radius: 12px;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 0.9rem;
+          font-weight: 500;
+          z-index: 9999;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+          border-left: 4px solid #4CAF50;
+          animation: slideIn 0.3s ease;
+          max-width: 400px;
+        `;
+        toast.textContent = '✅ Product added to cart!';
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+          toast.style.opacity = '0';
+          toast.style.transition = 'opacity 0.3s';
+          setTimeout(() => toast.remove(), 300);
+        }, 2500);
+      } else {
+        alert(data.message || 'Failed to add to cart');
+      }
+    } catch (err) {
+      console.error('Add to cart error:', err);
+      alert('Network error. Please try again.');
+    } finally {
+      setAddingToCart(false);
+    }
+  };
+
   const handlePurchase = () => {
+    // Check if user is logged in
+    const token = localStorage.getItem('token');
+    if (!token) {
+      if (window.confirm('Please login to purchase. Go to login?')) {
+        navigate('/login');
+      }
+      return;
+    }
     alert('Purchase functionality coming soon!');
   };
 
@@ -284,58 +366,35 @@ const ProductDetails = () => {
   // ── Loading State ──
   if (loading) {
     return (
-      <>
+      <div className="full-bleed w-full min-h-screen bg-white flex flex-col">
         <UserHeader />
         <style>{`
           @keyframes pd-spin { to { transform: rotate(360deg); } }
         `}</style>
-        <div style={{
-          minHeight: '100vh',
-          background: '#f5f7f5',
-          paddingTop: '80px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{
-              width: '48px',
-              height: '48px',
-              border: '4px solid #c8e6c9',
-              borderTopColor: '#2E7D32',
-              borderRadius: '50%',
-              animation: 'pd-spin 0.9s linear infinite',
-              margin: '0 auto 16px'
-            }} />
-            <p style={{ color: '#546e7a', fontFamily: "'DM Sans', sans-serif", fontSize: '0.95rem' }}>
-              Loading product details...
-            </p>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading product details...</p>
           </div>
         </div>
-      </>
+      </div>
     );
   }
 
   // ── Error State ──
   if (error || !product) {
     return (
-      <>
+      <div className="full-bleed w-full min-h-screen bg-gray-50 flex flex-col">
         <UserHeader />
-        <div style={{
-          minHeight: '100vh',
-          background: '#f5f7f5',
-          paddingTop: '80px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
+        <div className="flex-1 flex items-center justify-center p-4">
           <div style={{
             textAlign: 'center',
             background: '#fff',
             padding: '40px',
             borderRadius: '16px',
             maxWidth: '400px',
-            border: '1px solid #ffebee'
+            border: '1px solid #ffebee',
+            width: '100%'
           }}>
             <AlertTriangleIcon size={48} style={{ color: '#ef5350' }} />
             <h3 style={{ color: '#c62828', margin: '16px 0 8px' }}>
@@ -366,7 +425,7 @@ const ProductDetails = () => {
             </button>
           </div>
         </div>
-      </>
+      </div>
     );
   }
 
@@ -378,7 +437,7 @@ const ProductDetails = () => {
   const stockStatus = getStockStatus(Number(product.quantity) || 0);
 
   return (
-    <>
+    <div className="full-bleed w-full min-h-screen bg-gray-50 flex flex-col">
       <UserHeader />
 
       <style>{`
@@ -393,17 +452,18 @@ const ProductDetails = () => {
           to { transform: rotate(360deg); }
         }
 
-        .pd-root {
-          font-family: 'DM Sans', sans-serif;
-          min-height: 100vh;
-          background: #f5f7f5;
-          padding-top: 80px;
+        @keyframes slideIn {
+          from { opacity: 0; transform: translateX(20px); }
+          to { opacity: 1; transform: translateX(0); }
         }
 
-        .pd-container {
+        .pd-root {
+          font-family: 'DM Sans', sans-serif;
+          flex: 1;
+          padding: 32px 20px 60px;
           max-width: 1200px;
           margin: 0 auto;
-          padding: 32px 20px 60px;
+          width: 100%;
         }
 
         /* ── Back Button ── */
@@ -883,9 +943,21 @@ const ProductDetails = () => {
           transition: opacity 0.2s, transform 0.15s;
         }
 
-        .pd-action-btn:hover {
+        .pd-action-btn:hover:not(:disabled) {
           opacity: 0.88;
           transform: translateY(-1px);
+        }
+
+        .pd-action-btn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+          transform: none;
+        }
+
+        .pd-action-btn.add-to-cart {
+          background: linear-gradient(135deg, #1565C0, #1E88E5);
+          color: #fff;
+          box-shadow: 0 4px 16px rgba(21, 101, 192, 0.25);
         }
 
         .pd-action-btn.message {
@@ -922,6 +994,17 @@ const ProductDetails = () => {
           color: #c62828;
         }
 
+        /* ── Spinner ── */
+        .spinner-small {
+          display: inline-block;
+          width: 18px;
+          height: 18px;
+          border: 2px solid rgba(255,255,255,0.3);
+          border-top-color: #fff;
+          border-radius: 50%;
+          animation: pd-spin 0.6s linear infinite;
+        }
+
         /* ── Responsive ── */
         @media (max-width: 968px) {
           .pd-content {
@@ -948,6 +1031,7 @@ const ProductDetails = () => {
         }
 
         @media (max-width: 640px) {
+          .pd-root { padding: 16px 12px; }
           .pd-info-meta {
             grid-template-columns: 1fr;
           }
@@ -978,240 +1062,250 @@ const ProductDetails = () => {
       `}</style>
 
       <div className="pd-root">
-        <div className="pd-container">
-          {/* ── Back Button ── */}
-          <button className="pd-back-btn" onClick={handleGoBack}>
-            <ArrowLeftIcon size={18} /> Back to Products
-          </button>
+        {/* ── Back Button ── */}
+        <button className="pd-back-btn" onClick={handleGoBack}>
+          <ArrowLeftIcon size={18} /> Back to Products
+        </button>
 
-          {/* ── Product Details ── */}
-          <div className="pd-card">
-            <div className="pd-content">
-              {/* ── Media Gallery ── */}
-              <div className="pd-gallery">
-                {mediaCount > 0 ? (
-                  <>
-                    {isVideo ? (
-                      <div className="pd-gallery-video-wrapper">
-                        <video
-                          ref={videoRef}
-                          src={getMediaUrl(currentMedia)}
-                          className="pd-gallery-image"
-                          playsInline
-                          onEnded={() => setIsVideoPlaying(false)}
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                            e.target.parentElement.innerHTML = `
-                              <div class="no-media">
-                                <div class="icon"><AlertTriangleIcon size={48} /></div>
-                                <p>Video failed to load</p>
-                              </div>
-                            `;
-                          }}
-                        />
-                        <div 
-                          className={`pd-video-overlay ${isVideoPlaying ? 'hidden' : ''}`}
-                          onClick={toggleVideoPlay}
-                        >
-                          {isVideoPlaying ? <PauseIcon size={56} /> : <PlayIcon size={56} />}
-                        </div>
-                        <span className="pd-media-badge">
-                          <VideoIcon size={14} /> Video
-                        </span>
-                      </div>
-                    ) : (
-                      <img
+        {/* ── Product Details ── */}
+        <div className="pd-card">
+          <div className="pd-content">
+            {/* ── Media Gallery ── */}
+            <div className="pd-gallery">
+              {mediaCount > 0 ? (
+                <>
+                  {isVideo ? (
+                    <div className="pd-gallery-video-wrapper">
+                      <video
+                        ref={videoRef}
                         src={getMediaUrl(currentMedia)}
-                        alt={product.name}
                         className="pd-gallery-image"
+                        playsInline
+                        onEnded={() => setIsVideoPlaying(false)}
                         onError={(e) => {
                           e.target.style.display = 'none';
                           e.target.parentElement.innerHTML = `
                             <div class="no-media">
-                              <div class="icon"><ImageIcon size={48} /></div>
-                              <p>Image failed to load</p>
+                              <div class="icon"><AlertTriangleIcon size={48} /></div>
+                              <p>Video failed to load</p>
                             </div>
                           `;
                         }}
                       />
-                    )}
-                    
-                    {mediaCount > 1 && (
-                      <>
-                        <button className="pd-gallery-nav prev" onClick={prevMedia}>
-                          ‹
-                        </button>
-                        <button className="pd-gallery-nav next" onClick={nextMedia}>
-                          ›
-                        </button>
-                        <div className="pd-gallery-dots">
-                          {product.images.map((_, index) => (
-                            <button
-                              key={index}
-                              className={`pd-gallery-dot ${index === currentMediaIndex ? 'active' : ''}`}
-                              onClick={() => {
-                                if (videoRef.current && isVideoPlaying) {
-                                  videoRef.current.pause();
-                                  setIsVideoPlaying(false);
-                                }
-                                setCurrentMediaIndex(index);
-                              }}
-                            />
-                          ))}
-                        </div>
-                        <span className="pd-media-counter">
-                          {currentMediaIndex + 1} / {mediaCount}
-                        </span>
-                      </>
-                    )}
-                    
-                    {!isVideo && (
+                      <div 
+                        className={`pd-video-overlay ${isVideoPlaying ? 'hidden' : ''}`}
+                        onClick={toggleVideoPlay}
+                      >
+                        {isVideoPlaying ? <PauseIcon size={56} /> : <PlayIcon size={56} />}
+                      </div>
                       <span className="pd-media-badge">
-                        <ImageIcon size={14} /> Image
+                        <VideoIcon size={14} /> Video
                       </span>
-                    )}
-                  </>
-                ) : (
-                  <div className="no-media">
-                    <div className="icon"><ImageIcon size={48} /></div>
-                    <p>No Media Available</p>
-                  </div>
-                )}
+                    </div>
+                  ) : (
+                    <img
+                      src={getMediaUrl(currentMedia)}
+                      alt={product.name}
+                      className="pd-gallery-image"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        e.target.parentElement.innerHTML = `
+                          <div class="no-media">
+                            <div class="icon"><ImageIcon size={48} /></div>
+                            <p>Image failed to load</p>
+                          </div>
+                        `;
+                      }}
+                    />
+                  )}
+                  
+                  {mediaCount > 1 && (
+                    <>
+                      <button className="pd-gallery-nav prev" onClick={prevMedia}>
+                        ‹
+                      </button>
+                      <button className="pd-gallery-nav next" onClick={nextMedia}>
+                        ›
+                      </button>
+                      <div className="pd-gallery-dots">
+                        {product.images.map((_, index) => (
+                          <button
+                            key={index}
+                            className={`pd-gallery-dot ${index === currentMediaIndex ? 'active' : ''}`}
+                            onClick={() => {
+                              if (videoRef.current && isVideoPlaying) {
+                                videoRef.current.pause();
+                                setIsVideoPlaying(false);
+                              }
+                              setCurrentMediaIndex(index);
+                            }}
+                          />
+                        ))}
+                      </div>
+                      <span className="pd-media-counter">
+                        {currentMediaIndex + 1} / {mediaCount}
+                      </span>
+                    </>
+                  )}
+                  
+                  {!isVideo && (
+                    <span className="pd-media-badge">
+                      <ImageIcon size={14} /> Image
+                    </span>
+                  )}
+                </>
+              ) : (
+                <div className="no-media">
+                  <div className="icon"><ImageIcon size={48} /></div>
+                  <p>No Media Available</p>
+                </div>
+              )}
+            </div>
+
+            {/* ── Thumbnail Strip ── */}
+            {mediaCount > 1 && (
+              <div className="pd-thumbnail-strip">
+                {product.images.map((media, index) => {
+                  const isVideoThumb = isVideoUrl(media.url);
+                  return (
+                    <div
+                      key={index}
+                      className={`pd-thumbnail-item ${index === currentMediaIndex ? 'active' : ''}`}
+                      onClick={() => {
+                        if (videoRef.current && isVideoPlaying) {
+                          videoRef.current.pause();
+                          setIsVideoPlaying(false);
+                        }
+                        setCurrentMediaIndex(index);
+                      }}
+                    >
+                      {isVideoThumb ? (
+                        <>
+                          <video src={media.url} muted playsInline />
+                          <div className="thumb-play">▶</div>
+                        </>
+                      ) : (
+                        <img src={media.url} alt={`Thumb ${index + 1}`} />
+                      )}
+                      <span className="thumb-badge">{isVideoThumb ? '🎬' : '🖼️'}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* ── Product Info ── */}
+            <div className="pd-info">
+              <span className="pd-info-category">{product.category}</span>
+              
+              <div className="pd-status-badge available">
+                <CheckIcon size={14} /> Available
               </div>
 
-              {/* ── Thumbnail Strip ── */}
-              {mediaCount > 1 && (
-                <div className="pd-thumbnail-strip">
-                  {product.images.map((media, index) => {
-                    const isVideoThumb = isVideoUrl(media.url);
-                    return (
-                      <div
-                        key={index}
-                        className={`pd-thumbnail-item ${index === currentMediaIndex ? 'active' : ''}`}
-                        onClick={() => {
-                          if (videoRef.current && isVideoPlaying) {
-                            videoRef.current.pause();
-                            setIsVideoPlaying(false);
-                          }
-                          setCurrentMediaIndex(index);
-                        }}
-                      >
-                        {isVideoThumb ? (
-                          <>
-                            <video src={media.url} muted playsInline />
-                            <div className="thumb-play">▶</div>
-                          </>
-                        ) : (
-                          <img src={media.url} alt={`Thumb ${index + 1}`} />
-                        )}
-                        <span className="thumb-badge">{isVideoThumb ? '🎬' : '🖼️'}</span>
-                      </div>
-                    );
-                  })}
+              <h1 className="pd-info-name">{product.name}</h1>
+              <div className="pd-info-price">
+                ₱{Number(product.price).toFixed(2)}
+                <span className="unit-label"> / {unitLabel}</span>
+              </div>
+
+              {/* Stock Status */}
+              <div 
+                className="pd-stock-info" 
+                style={{ 
+                  backgroundColor: stockStatus.bg,
+                  color: stockStatus.color
+                }}
+              >
+                <span className="status-icon">{stockStatus.icon}</span>
+                <span className="status-text">
+                  {stockStatus.label}: {product.quantity} {unitLabel} available
+                </span>
+              </div>
+
+              <p className="pd-info-description">{product.description}</p>
+
+              <div className="pd-info-meta">
+                <div className="pd-meta-item">
+                  <span className="pd-meta-label">Total Stock</span>
+                  <span className="pd-meta-value">
+                    {product.quantity} <span className="unit">{unitLabel}</span>
+                  </span>
+                </div>
+                <div className="pd-meta-item">
+                  <span className="pd-meta-label">Posted</span>
+                  <span className="pd-meta-value">{formatDate(product.createdAt)}</span>
+                </div>
+                <div className="pd-meta-item">
+                  <span className="pd-meta-label">Unit</span>
+                  <span className="pd-meta-value">{unitFullLabel}</span>
+                </div>
+                <div className="pd-meta-item">
+                  <span className="pd-meta-label">Category</span>
+                  <span className="pd-meta-value">{product.category}</span>
+                </div>
+              </div>
+
+              {/* ── Farmer Info ── */}
+              <div className="pd-info-farmer">
+                <div className="pd-farmer-avatar">
+                  {farmerAvatar ? (
+                    <img src={farmerAvatar} alt={farmerName} />
+                  ) : (
+                    <span className="fallback">{getFarmerInitial(farmerName)}</span>
+                  )}
+                </div>
+                <div className="pd-farmer-info">
+                  <p className="pd-farmer-name">{farmerName}</p>
+                </div>
+                <button
+                  className="pd-action-btn message"
+                  onClick={handleMessage}
+                  style={{ flex: 'none', padding: '6px 16px', fontSize: '0.78rem' }}
+                >
+                  <MessageIcon size={14} /> Message
+                </button>
+              </div>
+
+              {/* ── Location ── */}
+              {locationDisplay && (
+                <div className="pd-info-location" onClick={handleViewOnMap}>
+                  <MapPinIcon size={18} color="#0d47a1" />
+                  <span className="location-text">
+                    <strong>Location:</strong> {locationDisplay}
+                  </span>
+                  <span style={{ fontSize: '0.78rem', color: '#0d47a1', fontWeight: 600 }}>
+                    View on Map →
+                  </span>
                 </div>
               )}
 
-              {/* ── Product Info ── */}
-              <div className="pd-info">
-                <span className="pd-info-category">{product.category}</span>
-                
-                <div className="pd-status-badge available">
-                  <CheckIcon size={14} /> Available
-                </div>
-
-                <h1 className="pd-info-name">{product.name}</h1>
-                <div className="pd-info-price">
-                  ₱{Number(product.price).toFixed(2)}
-                  <span className="unit-label"> / {unitLabel}</span>
-                </div>
-
-                {/* Stock Status */}
-                <div 
-                  className="pd-stock-info" 
-                  style={{ 
-                    backgroundColor: stockStatus.bg,
-                    color: stockStatus.color
-                  }}
+              {/* ── Actions ── */}
+              <div className="pd-info-actions">
+                <button
+                  className="pd-action-btn add-to-cart"
+                  onClick={handleAddToCart}
+                  disabled={addingToCart}
                 >
-                  <span className="status-icon">{stockStatus.icon}</span>
-                  <span className="status-text">
-                    {stockStatus.label}: {product.quantity} {unitLabel} available
-                  </span>
-                </div>
-
-                <p className="pd-info-description">{product.description}</p>
-
-                <div className="pd-info-meta">
-                  <div className="pd-meta-item">
-                    <span className="pd-meta-label">Total Stock</span>
-                    <span className="pd-meta-value">
-                      {product.quantity} <span className="unit">{unitLabel}</span>
-                    </span>
-                  </div>
-                  <div className="pd-meta-item">
-                    <span className="pd-meta-label">Posted</span>
-                    <span className="pd-meta-value">{formatDate(product.createdAt)}</span>
-                  </div>
-                  <div className="pd-meta-item">
-                    <span className="pd-meta-label">Unit</span>
-                    <span className="pd-meta-value">{unitFullLabel}</span>
-                  </div>
-                  <div className="pd-meta-item">
-                    <span className="pd-meta-label">Category</span>
-                    <span className="pd-meta-value">{product.category}</span>
-                  </div>
-                </div>
-
-                {/* ── Farmer Info ── */}
-                <div className="pd-info-farmer">
-                  <div className="pd-farmer-avatar">
-                    {farmerAvatar ? (
-                      <img src={farmerAvatar} alt={farmerName} />
-                    ) : (
-                      <span className="fallback">{getFarmerInitial(farmerName)}</span>
-                    )}
-                  </div>
-                  <div className="pd-farmer-info">
-                    <p className="pd-farmer-name">{farmerName}</p>
-                  </div>
-                  <button
-                    className="pd-action-btn message"
-                    onClick={handleMessage}
-                    style={{ flex: 'none', padding: '6px 16px', fontSize: '0.78rem' }}
-                  >
-                    <MessageIcon size={14} /> Message
-                  </button>
-                </div>
-
-                {/* ── Location ── */}
-                {locationDisplay && (
-                  <div className="pd-info-location" onClick={handleViewOnMap}>
-                    <MapPinIcon size={18} color="#0d47a1" />
-                    <span className="location-text">
-                      <strong>Location:</strong> {locationDisplay}
-                    </span>
-                    <span style={{ fontSize: '0.78rem', color: '#0d47a1', fontWeight: 600 }}>
-                      View on Map →
-                    </span>
-                  </div>
-                )}
-
-                {/* ── Actions ── */}
-                <div className="pd-info-actions">
-                  <button
-                    className="pd-action-btn purchase"
-                    onClick={handlePurchase}
-                    style={{ flex: 1 }}
-                  >
-                    <CreditCardIcon size={18} /> Purchase Now
-                  </button>
-                </div>
+                  {addingToCart ? (
+                    <span className="spinner-small"></span>
+                  ) : (
+                    <>
+                      <CartPlusIcon size={18} /> Add to Cart
+                    </>
+                  )}
+                </button>
+                <button
+                  className="pd-action-btn purchase"
+                  onClick={handlePurchase}
+                >
+                  <CreditCardIcon size={18} /> Buy Now
+                </button>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 };
 

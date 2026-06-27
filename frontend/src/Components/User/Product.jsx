@@ -46,6 +46,16 @@ const ShoppingCartIcon = ({ size = 18 }) => (
   </svg>
 );
 
+const CartPlusIcon = ({ size = 18 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="9" cy="21" r="1"/>
+    <circle cx="20" cy="21" r="1"/>
+    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+    <line x1="10" y1="11" x2="10" y2="17"/>
+    <line x1="7" y1="14" x2="13" y2="14"/>
+  </svg>
+);
+
 const ClockIcon = ({ size = 16 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="10"/>
@@ -100,6 +110,7 @@ const Product = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [viewMode, setViewMode] = useState('grid');
+  const [addingToCart, setAddingToCart] = useState(null);
 
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001';
 
@@ -154,9 +165,86 @@ const Product = () => {
     });
   };
 
-  const handlePurchase = (e, product) => {
+  const handleAddToCart = async (e, product) => {
     e.stopPropagation();
-    alert('Purchase functionality coming soon!');
+    
+    const token = localStorage.getItem('token');
+    if (!token) {
+      if (window.confirm('Please login to add items to cart. Go to login?')) {
+        navigate('/login');
+      }
+      return;
+    }
+
+    setAddingToCart(product._id);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/cart/add`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ productId: product._id, quantity: 1 })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        const toast = document.createElement('div');
+        toast.style.cssText = `
+          position: fixed;
+          top: 100px;
+          right: 20px;
+          background: #e8f5e9;
+          color: #1b5e20;
+          padding: 14px 24px;
+          border-radius: 12px;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 0.9rem;
+          font-weight: 500;
+          z-index: 9999;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+          border-left: 4px solid #4CAF50;
+          animation: slideIn 0.3s ease;
+          max-width: 400px;
+        `;
+        toast.textContent = '✅ Product added to cart!';
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+          toast.style.opacity = '0';
+          toast.style.transition = 'opacity 0.3s';
+          setTimeout(() => toast.remove(), 300);
+        }, 2500);
+      } else {
+        alert(data.message || 'Failed to add to cart');
+      }
+    } catch (err) {
+      console.error('Add to cart error:', err);
+      alert('Network error. Please try again.');
+    } finally {
+      setAddingToCart(null);
+    }
+  };
+
+  const handleBuyNow = (e, product) => {
+    e.stopPropagation();
+    const token = localStorage.getItem('token');
+    if (!token) {
+      if (window.confirm('Please login to purchase. Go to login?')) {
+        navigate('/login');
+      }
+      return;
+    }
+    // Navigate to checkout with product data
+    navigate('/checkout', { 
+      state: { 
+        product: product,
+        quantity: 1,
+        isSoloCheckout: true 
+      } 
+    });
   };
 
   const formatDate = (dateString) => {
@@ -293,6 +381,11 @@ const Product = () => {
 
         @keyframes prod-spin {
           to { transform: rotate(360deg); }
+        }
+
+        @keyframes slideIn {
+          from { opacity: 0; transform: translateX(20px); }
+          to { opacity: 1; transform: translateX(0); }
         }
 
         .prod-root {
@@ -812,9 +905,22 @@ const Product = () => {
           transition: opacity 0.2s, transform 0.15s;
         }
 
-        .prod-action-btn:hover {
+        .prod-action-btn:hover:not(:disabled) {
           opacity: 0.88;
           transform: translateY(-1px);
+        }
+
+        .prod-action-btn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+          transform: none;
+        }
+
+        .prod-action-btn.add-to-cart {
+          background: linear-gradient(135deg, #1565C0, #1E88E5);
+          color: #fff;
+          box-shadow: 0 4px 14px rgba(21, 101, 192, 0.25);
+          flex: 1;
         }
 
         .prod-action-btn.purchase {
@@ -869,6 +975,17 @@ const Product = () => {
         .prod-media-type svg {
           width: 12px;
           height: 12px;
+        }
+
+        /* ── Add to Cart Loading Spinner ── */
+        .spinner-small {
+          display: inline-block;
+          width: 16px;
+          height: 16px;
+          border: 2px solid rgba(255,255,255,0.3);
+          border-top-color: #fff;
+          border-radius: 50%;
+          animation: prod-spin 0.6s linear infinite;
         }
 
         @media (max-width: 768px) {
@@ -999,6 +1116,7 @@ const Product = () => {
                 const media = getFirstMedia(product);
                 const isVideo = media ? isVideoUrl(media.url) : false;
                 const mediaCount = product.images?.length || 0;
+                const isAdding = addingToCart === product._id;
                 
                 return (
                   <div 
@@ -1100,10 +1218,23 @@ const Product = () => {
 
                       <div className="prod-card-actions">
                         <button
-                          className="prod-action-btn purchase"
-                          onClick={(e) => handlePurchase(e, product)}
+                          className="prod-action-btn add-to-cart"
+                          onClick={(e) => handleAddToCart(e, product)}
+                          disabled={isAdding}
                         >
-                          Purchase
+                          {isAdding ? (
+                            <span className="spinner-small"></span>
+                          ) : (
+                            <>
+                              <CartPlusIcon size={16} /> Add to Cart
+                            </>
+                          )}
+                        </button>
+                        <button
+                          className="prod-action-btn purchase"
+                          onClick={(e) => handleBuyNow(e, product)}
+                        >
+                          Buy Now
                         </button>
                       </div>
                     </div>
