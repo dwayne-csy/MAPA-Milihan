@@ -1,4 +1,4 @@
-const { ForumPost, Message } = require('../models/Forum');
+const { ForumPost } = require('../models/Forum');
 const { uploadToCloudinary, deleteFromCloudinary } = require('../utils/Cloudinary');
 const fs = require('fs');
 const os = require('os');
@@ -130,14 +130,21 @@ const uploadFilesToCloudinaryWithTempFiles = async (files, folder = 'Mapa-Miliha
   return successfulUploads;
 };
 
-// ========== CREATE POST - FIXED ==========
+// Helper function to determine user type from role
+const getUserTypeFromRole = (user) => {
+  if (user.role === 'farmer') return 'Farmer';
+  if (user.role === 'admin') return 'Admin';
+  if (user.userType) return user.userType;
+  return 'User';
+};
+
+// ========== CREATE POST ==========
 exports.createPost = async (req, res) => {
   try {
     console.log('📝 Create post request received');
     console.log('📋 Request body:', req.body);
     console.log('📋 Request files:', req.files ? req.files.length : 0);
     
-    // LOG THE USER OBJECT TO DEBUG
     console.log('👤 User object:', JSON.stringify(req.user, null, 2));
     console.log('👤 User Type from req.user:', req.user.userType);
     console.log('👤 User Role from req.user:', req.user.role);
@@ -145,18 +152,7 @@ exports.createPost = async (req, res) => {
     const { title, content, category } = req.body;
     const userId = req.user.id;
     
-    // FIX: Determine userType based on role
-    // This is the most reliable way - check the role from the user object
-    let userType = 'User';
-    if (req.user.role === 'farmer') {
-      userType = 'Farmer';
-    } else if (req.user.role === 'admin') {
-      userType = 'Admin';
-    } else if (req.user.userType) {
-      // Fallback to userType if it exists
-      userType = req.user.userType;
-    }
-    
+    const userType = getUserTypeFromRole(req.user);
     const userName = req.user.name || req.user.username || 'User';
 
     console.log(`👤 Final userType: ${userType}, userName: ${userName}`);
@@ -208,7 +204,7 @@ exports.createPost = async (req, res) => {
       media: mediaUrls,
       author: {
         userId: userId,
-        userType: userType, // Now correctly set based on role
+        userType: userType,
         name: userName
       }
     });
@@ -263,7 +259,7 @@ exports.getAllPosts = async (req, res) => {
     const total = await ForumPost.countDocuments(filter);
 
     const userId = req.user ? req.user.id : null;
-    const userType = req.user ? req.user.userType : null;
+    const userType = req.user ? getUserTypeFromRole(req.user) : null;
 
     if (userId) {
       posts.forEach(post => {
@@ -272,9 +268,8 @@ exports.getAllPosts = async (req, res) => {
         );
         post.likeCount = post.likes.length;
         post.isOwner = post.author.userId.toString() === userId;
-        // Ensure userType is properly set in the response
         if (post.author && !post.author.userType) {
-          post.author.userType = 'User'; // Default fallback
+          post.author.userType = 'User';
         }
       });
     }
@@ -304,7 +299,7 @@ exports.getPostById = async (req, res) => {
   try {
     const postId = req.params.id;
     const userId = req.user ? req.user.id : null;
-    const userType = req.user ? req.user.userType : null;
+    const userType = req.user ? getUserTypeFromRole(req.user) : null;
 
     const post = await ForumPost.findById(postId).lean();
 
@@ -352,15 +347,7 @@ exports.updatePost = async (req, res) => {
     const { title, content, category, removeMediaIds } = req.body;
     const userId = req.user.id;
     
-    // Determine userType from role
-    let userType = 'User';
-    if (req.user.role === 'farmer') {
-      userType = 'Farmer';
-    } else if (req.user.role === 'admin') {
-      userType = 'Admin';
-    } else if (req.user.userType) {
-      userType = req.user.userType;
-    }
+    const userType = getUserTypeFromRole(req.user);
 
     const post = await ForumPost.findById(postId);
 
@@ -441,15 +428,7 @@ exports.deletePost = async (req, res) => {
     const postId = req.params.id;
     const userId = req.user.id;
     
-    // Determine userType from role
-    let userType = 'User';
-    if (req.user.role === 'farmer') {
-      userType = 'Farmer';
-    } else if (req.user.role === 'admin') {
-      userType = 'Admin';
-    } else if (req.user.userType) {
-      userType = req.user.userType;
-    }
+    const userType = getUserTypeFromRole(req.user);
 
     const post = await ForumPost.findById(postId);
 
@@ -503,16 +482,7 @@ exports.addComment = async (req, res) => {
     const { content, parentCommentId, replyToUserId, replyToUserName } = req.body;
     const userId = req.user.id;
     
-    // Determine userType from role
-    let userType = 'User';
-    if (req.user.role === 'farmer') {
-      userType = 'Farmer';
-    } else if (req.user.role === 'admin') {
-      userType = 'Admin';
-    } else if (req.user.userType) {
-      userType = req.user.userType;
-    }
-    
+    const userType = getUserTypeFromRole(req.user);
     const userName = req.user.name || req.user.username;
 
     const post = await ForumPost.findById(postId);
@@ -674,15 +644,7 @@ exports.deleteComment = async (req, res) => {
     const commentId = req.params.commentId;
     const userId = req.user.id;
     
-    // Determine userType from role
-    let userType = 'User';
-    if (req.user.role === 'farmer') {
-      userType = 'Farmer';
-    } else if (req.user.role === 'admin') {
-      userType = 'Admin';
-    } else if (req.user.userType) {
-      userType = req.user.userType;
-    }
+    const userType = getUserTypeFromRole(req.user);
 
     const post = await ForumPost.findById(postId);
 
@@ -747,15 +709,7 @@ exports.toggleLikePost = async (req, res) => {
     const postId = req.params.id;
     const userId = req.user.id;
     
-    // Determine userType from role
-    let userType = 'User';
-    if (req.user.role === 'farmer') {
-      userType = 'Farmer';
-    } else if (req.user.role === 'admin') {
-      userType = 'Admin';
-    } else if (req.user.userType) {
-      userType = req.user.userType;
-    }
+    const userType = getUserTypeFromRole(req.user);
 
     const post = await ForumPost.findById(postId);
 
@@ -806,15 +760,7 @@ exports.toggleLikeComment = async (req, res) => {
     const commentId = req.params.commentId;
     const userId = req.user.id;
     
-    // Determine userType from role
-    let userType = 'User';
-    if (req.user.role === 'farmer') {
-      userType = 'Farmer';
-    } else if (req.user.role === 'admin') {
-      userType = 'Admin';
-    } else if (req.user.userType) {
-      userType = req.user.userType;
-    }
+    const userType = getUserTypeFromRole(req.user);
 
     const post = await ForumPost.findById(postId);
 
@@ -874,15 +820,7 @@ exports.reportPost = async (req, res) => {
     const { reason, description } = req.body;
     const userId = req.user.id;
     
-    // Determine userType from role
-    let userType = 'User';
-    if (req.user.role === 'farmer') {
-      userType = 'Farmer';
-    } else if (req.user.role === 'admin') {
-      userType = 'Admin';
-    } else if (req.user.userType) {
-      userType = req.user.userType;
-    }
+    const userType = getUserTypeFromRole(req.user);
 
     const post = await ForumPost.findById(postId);
 
@@ -943,15 +881,7 @@ exports.reportComment = async (req, res) => {
     const { reason, description } = req.body;
     const userId = req.user.id;
     
-    // Determine userType from role
-    let userType = 'User';
-    if (req.user.role === 'farmer') {
-      userType = 'Farmer';
-    } else if (req.user.role === 'admin') {
-      userType = 'Admin';
-    } else if (req.user.userType) {
-      userType = req.user.userType;
-    }
+    const userType = getUserTypeFromRole(req.user);
 
     const post = await ForumPost.findById(postId);
 
@@ -1012,263 +942,6 @@ exports.reportComment = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error reporting comment',
-      error: error.message
-    });
-  }
-};
-
-// ========== SEND MESSAGE ==========
-exports.sendMessage = async (req, res) => {
-  try {
-    const { receiverId, receiverType, receiverName, content } = req.body;
-    const senderId = req.user.id;
-    
-    // Determine senderType from role
-    let senderType = 'User';
-    if (req.user.role === 'farmer') {
-      senderType = 'Farmer';
-    } else if (req.user.role === 'admin') {
-      senderType = 'Admin';
-    } else if (req.user.userType) {
-      senderType = req.user.userType;
-    }
-    
-    const senderName = req.user.name || req.user.username;
-
-    if (!receiverId || !receiverType) {
-      return res.status(400).json({
-        success: false,
-        message: 'Receiver ID and type are required'
-      });
-    }
-
-    const files = req.files || [];
-    let mediaUrls = [];
-
-    if (files && files.length > 0) {
-      try {
-        const uploadedFiles = await uploadFilesToCloudinaryWithTempFiles(files, 'mapa-milihan/messages');
-        
-        if (uploadedFiles && uploadedFiles.length > 0) {
-          mediaUrls = uploadedFiles.map(file => ({
-            url: file.url,
-            publicId: file.public_id,
-            type: file.type || 'image',
-            mimetype: file.mimetype,
-            size: file.size
-          }));
-        }
-      } catch (uploadError) {
-        console.error('Message media upload error:', uploadError);
-      }
-    }
-
-    let conversation = await Message.findOne({
-      participants: {
-        $all: [
-          { $elemMatch: { userId: senderId, userType: senderType } },
-          { $elemMatch: { userId: receiverId, userType: receiverType } }
-        ]
-      }
-    });
-
-    if (!conversation) {
-      conversation = new Message({
-        participants: [
-          {
-            userId: senderId,
-            userType: senderType,
-            name: senderName
-          },
-          {
-            userId: receiverId,
-            userType: receiverType,
-            name: receiverName || 'User'
-          }
-        ],
-        messages: [],
-        lastMessageAt: Date.now()
-      });
-    }
-
-    const message = {
-      senderId,
-      senderType,
-      content: content || '',
-      media: mediaUrls,
-      isRead: false,
-      createdAt: Date.now()
-    };
-
-    conversation.messages.push(message);
-    conversation.lastMessageAt = Date.now();
-    await conversation.save();
-
-    res.status(201).json({
-      success: true,
-      message: 'Message sent successfully',
-      data: conversation
-    });
-  } catch (error) {
-    console.error('Send message error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error sending message',
-      error: error.message
-    });
-  }
-};
-
-// ========== GET CONVERSATIONS ==========
-exports.getConversations = async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const userType = req.user.userType || 'User';
-
-    const conversations = await Message.find({
-      'participants': {
-        $elemMatch: {
-          userId: userId,
-          userType: userType
-        }
-      }
-    })
-      .sort({ lastMessageAt: -1 })
-      .lean();
-
-    conversations.forEach(conv => {
-      conv.unreadCount = conv.messages.filter(msg => 
-        msg.senderId.toString() !== userId && !msg.isRead
-      ).length;
-    });
-
-    res.status(200).json({
-      success: true,
-      data: conversations
-    });
-  } catch (error) {
-    console.error('Get conversations error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching conversations',
-      error: error.message
-    });
-  }
-};
-
-// ========== GET CONVERSATION MESSAGES ==========
-exports.getConversationMessages = async (req, res) => {
-  try {
-    const conversationId = req.params.id;
-    const userId = req.user.id;
-
-    const conversation = await Message.findById(conversationId);
-
-    if (!conversation) {
-      return res.status(404).json({
-        success: false,
-        message: 'Conversation not found'
-      });
-    }
-
-    const isParticipant = conversation.participants.some(p => 
-      p.userId.toString() === userId
-    );
-
-    if (!isParticipant) {
-      return res.status(403).json({
-        success: false,
-        message: 'You are not a participant in this conversation'
-      });
-    }
-
-    conversation.messages.forEach(msg => {
-      if (msg.senderId.toString() !== userId && !msg.isRead) {
-        msg.isRead = true;
-        msg.readAt = Date.now();
-      }
-    });
-
-    await conversation.save();
-
-    res.status(200).json({
-      success: true,
-      data: conversation
-    });
-  } catch (error) {
-    console.error('Get messages error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching messages',
-      error: error.message
-    });
-  }
-};
-
-// ========== REPORT MESSAGE ==========
-exports.reportMessage = async (req, res) => {
-  try {
-    const conversationId = req.params.id;
-    const messageId = req.params.messageId;
-    const { reason, description } = req.body;
-    const userId = req.user.id;
-    
-    // Determine userType from role
-    let userType = 'User';
-    if (req.user.role === 'farmer') {
-      userType = 'Farmer';
-    } else if (req.user.role === 'admin') {
-      userType = 'Admin';
-    } else if (req.user.userType) {
-      userType = req.user.userType;
-    }
-
-    const conversation = await Message.findById(conversationId);
-
-    if (!conversation) {
-      return res.status(404).json({
-        success: false,
-        message: 'Conversation not found'
-      });
-    }
-
-    const message = conversation.messages.id(messageId);
-
-    if (!message) {
-      return res.status(404).json({
-        success: false,
-        message: 'Message not found'
-      });
-    }
-
-    if (!message.reports) {
-      message.reports = [];
-    }
-
-    const report = {
-      reportedBy: {
-        userId,
-        userType
-      },
-      reason,
-      description: description || '',
-      status: 'Pending',
-      createdAt: Date.now()
-    };
-
-    message.reports.push(report);
-    await conversation.save();
-
-    res.status(201).json({
-      success: true,
-      message: 'Message reported successfully',
-      data: conversation
-    });
-  } catch (error) {
-    console.error('Report message error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error reporting message',
       error: error.message
     });
   }

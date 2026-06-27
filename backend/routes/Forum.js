@@ -78,23 +78,4 @@ router.post('/posts/:id/report', isAuthenticatedUser, forumController.reportPost
 // Report comment
 router.post('/posts/:id/comments/:commentId/report', isAuthenticatedUser, forumController.reportComment);
 
-// ===================== MESSAGE ROUTES =====================
-
-// Send message with media
-router.post(
-  '/messages', 
-  isAuthenticatedUser, 
-  upload.array('media', 5),
-  forumController.sendMessage
-);
-
-// Get user conversations
-router.get('/messages/conversations', isAuthenticatedUser, forumController.getConversations);
-
-// Get conversation messages
-router.get('/messages/:id', isAuthenticatedUser, forumController.getConversationMessages);
-
-// Report message
-router.post('/messages/:id/messages/:messageId/report', isAuthenticatedUser, forumController.reportMessage);
-
 module.exports = router;

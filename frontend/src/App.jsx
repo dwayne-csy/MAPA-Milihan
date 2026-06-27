@@ -28,6 +28,33 @@ import OrderHistory from './Components/User/OrderHistory';
 import OrderDetails from './Components/User/OrderDetails';
 import OrderList from './Components/Farmer/orders/OrderList';
 import ViewOrder from './Components/Farmer/orders/ViewOrder';
+import UProfile from "./Components/User/UProfile";
+import FProfile from "./Components/Farmer/FProfile";
+// Import Message components
+import UserMessage from "./Components/User/Message";
+import FarmerMessage from "./Components/Farmer/FarmerMessage";
+
+// Profile wrapper component to determine which profile to show
+const ProfileWrapper = () => {
+  const user = getUser();
+  const role = user?.role || 'user';
+  
+  if (role === 'farmer') {
+    return <FProfile />;
+  }
+  return <UProfile />;
+};
+
+// Message wrapper component to determine which message view to show
+const MessageWrapper = () => {
+  const user = getUser();
+  const role = user?.role || 'user';
+  
+  if (role === 'farmer') {
+    return <FarmerMessage />;
+  }
+  return <UserMessage />;
+};
 
 const App = () => {
   const token = isAuthenticated();
@@ -61,10 +88,14 @@ const App = () => {
         <Route path="/maps" element={<ProtectedRoute requiredRole="user"><Maps /></ProtectedRoute>} />
         <Route path="/forum" element={<ProtectedRoute requiredRole="user"><Forum /></ProtectedRoute>} />
         <Route path="/cart" element={<ProtectedRoute requiredRole="user"><Cart /></ProtectedRoute>} />
-        <Route path="/checkout" element={<Checkout />} />
-        <Route path="/checkout/confirmation" element={<CheckoutConfirmation />} />
-        <Route path="/orders" element={<OrderHistory />} />
-        <Route path="/orders/:orderId" element={<OrderDetails />} />
+        <Route path="/checkout" element={<ProtectedRoute requiredRole="user"><Checkout /></ProtectedRoute>} />
+        <Route path="/checkout/confirmation" element={<ProtectedRoute requiredRole="user"><CheckoutConfirmation /></ProtectedRoute>} />
+        <Route path="/orders" element={<ProtectedRoute requiredRole="user"><OrderHistory /></ProtectedRoute>} />
+        <Route path="/orders/:orderId" element={<ProtectedRoute requiredRole="user"><OrderDetails /></ProtectedRoute>} />
+        
+        {/* User Messages Route - IMPORTANT: These must be above the catch-all */}
+        <Route path="/messages" element={<ProtectedRoute><MessageWrapper /></ProtectedRoute>} />
+        <Route path="/messages/:userId" element={<ProtectedRoute><MessageWrapper /></ProtectedRoute>} />
         
         {/* Farmer Protected Routes */}
         <Route path="/farmer/dashboard" element={<ProtectedRoute requiredRole="farmer"><Dashboard /></ProtectedRoute>} />
@@ -74,12 +105,18 @@ const App = () => {
         <Route path="/farmer/edit-profile" element={<ProtectedRoute requiredRole="farmer"><FarmerEditProfile /></ProtectedRoute>} />
         <Route path="/farmer/view-product/:id" element={<ProtectedRoute requiredRole="farmer"><ViewProduct /></ProtectedRoute>} />
         <Route path="/farmer/forum" element={<ProtectedRoute requiredRole="farmer"><FarmerForum /></ProtectedRoute>} />
-        {/* ORDER ROUTES - Updated to match component navigation */}
         <Route path="/farmer/orderlist" element={<ProtectedRoute requiredRole="farmer"><OrderList /></ProtectedRoute>} />
         <Route path="/farmer/order/:id" element={<ProtectedRoute requiredRole="farmer"><ViewOrder /></ProtectedRoute>} />
+        
+        {/* Farmer Messages Route */}
+        <Route path="/farmer/messages" element={<ProtectedRoute requiredRole="farmer"><FarmerMessage /></ProtectedRoute>} />
+        <Route path="/farmer/messages/:userId" element={<ProtectedRoute requiredRole="farmer"><FarmerMessage /></ProtectedRoute>} />
 
         {/* Admin Protected Routes */}
         <Route path="/admin/dashboard" element={<ProtectedRoute requiredRole="admin"><AdminDashboard /></ProtectedRoute>} />
+
+        {/* Single Profile Route */}
+        <Route path="/profile/:userId" element={<ProtectedRoute><ProfileWrapper /></ProtectedRoute>} />
 
         {/* Catch-all Redirect */}
         <Route path="*" element={<Navigate to={getDefaultRoute()} replace />} />

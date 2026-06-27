@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom'; // Add this import
 import axios from 'axios';
 import FarmerHeader from '../layouts/FarmerHeader';
 
@@ -56,6 +57,7 @@ const compareUserId = (id1, id2) => {
 };
 
 const FarmerForum = () => {
+  const navigate = useNavigate(); // Add useNavigate hook
   const [user, setUser] = useState(null);
   const [posts, setPosts] = useState([]);
   const [selectedPost, setSelectedPost] = useState(null);
@@ -121,6 +123,13 @@ const FarmerForum = () => {
     }
   }, []);
 
+  // Function to navigate to user profile
+  const navigateToProfile = (userId) => {
+    if (userId) {
+      navigate(`/profile/${userId}`);
+    }
+  };
+
   // Fetch posts
   const fetchPosts = async (pageNum = 1) => {
     try {
@@ -130,7 +139,6 @@ const FarmerForum = () => {
       const response = await axios.get(`${API_BASE_URL}/api/forums/posts?page=${pageNum}&limit=10`, { headers });
       const postsData = response.data.data;
       
-      // Log posts data to debug userType
       console.log('📊 Posts data:', postsData.map(p => ({
         id: p._id,
         title: p.title,
@@ -998,8 +1006,11 @@ const FarmerForum = () => {
     return (
       <div key={comment._id || comment.createdAt} className={`${isReply ? 'ml-8 mt-2' : 'mt-3'}`}>
         <div className="flex gap-3">
-          {/* Comment Avatar */}
-          <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-xs flex-shrink-0 overflow-hidden">
+          {/* Comment Avatar - Clickable */}
+          <div 
+            className="w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-xs flex-shrink-0 overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={() => navigateToProfile(comment.author?.userId)}
+          >
             {avatarUrl ? (
               <img 
                 src={avatarUrl} 
@@ -1010,7 +1021,7 @@ const FarmerForum = () => {
                   const parent = e.target.parentElement;
                   const initial = getInitial(comment.author.name);
                   const color = getDefaultAvatarColor(comment.author?.userType || 'User');
-                  parent.className = `w-8 h-8 rounded-full ${color} flex items-center justify-center text-white font-semibold text-xs flex-shrink-0`;
+                  parent.className = `w-8 h-8 rounded-full ${color} flex items-center justify-center text-white font-semibold text-xs flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity`;
                   parent.textContent = initial;
                 }}
               />
@@ -1024,7 +1035,13 @@ const FarmerForum = () => {
           <div className="flex-1 bg-gray-50 p-3 rounded-lg">
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <strong className="text-sm text-gray-700">{comment.author.name}</strong>
+                {/* Comment Author Name - Clickable */}
+                <strong 
+                  className="text-sm text-gray-700 cursor-pointer hover:text-blue-600 transition-colors"
+                  onClick={() => navigateToProfile(comment.author?.userId)}
+                >
+                  {comment.author.name}
+                </strong>
                 <span className="text-xs text-gray-500">{new Date(comment.createdAt).toLocaleDateString()}</span>
                 {comment.author.userType === 'Admin' && (
                   <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">Admin</span>
@@ -1419,13 +1436,16 @@ const FarmerForum = () => {
             const postAvatarUrl = getUserAvatarUrl(post.author);
             const postAvatarColor = getDefaultAvatarColor(post.author?.userType || 'User');
             
-            // Get the correct user type display
             const userTypeDisplay = post.author?.userType || 'User';
             
             return (
               <div key={post._id} className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow duration-200">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0 overflow-hidden">
+                  {/* Post Author Avatar - Clickable */}
+                  <div 
+                    className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0 overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={() => navigateToProfile(post.author?.userId)}
+                  >
                     {postAvatarUrl ? (
                       <img 
                         src={postAvatarUrl} 
@@ -1436,7 +1456,7 @@ const FarmerForum = () => {
                           const parent = e.target.parentElement;
                           const initial = getInitial(post.author.name);
                           const color = getDefaultAvatarColor(post.author?.userType || 'User');
-                          parent.className = `w-10 h-10 rounded-full ${color} flex items-center justify-center text-white font-semibold text-sm flex-shrink-0`;
+                          parent.className = `w-10 h-10 rounded-full ${color} flex items-center justify-center text-white font-semibold text-sm flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity`;
                           parent.textContent = initial;
                         }}
                       />
@@ -1447,7 +1467,13 @@ const FarmerForum = () => {
                     )}
                   </div>
                   <div className="flex-1">
-                    <p className="font-semibold text-gray-800">{post.author.name}</p>
+                    {/* Post Author Name - Clickable */}
+                    <p 
+                      className="font-semibold text-gray-800 cursor-pointer hover:text-blue-600 transition-colors"
+                      onClick={() => navigateToProfile(post.author?.userId)}
+                    >
+                      {post.author.name}
+                    </p>
                     <div className="flex items-center gap-2 text-xs text-gray-500">
                       <span className={userTypeDisplay === 'Farmer' ? 'text-emerald-600 font-medium' : ''}>
                         {userTypeDisplay}

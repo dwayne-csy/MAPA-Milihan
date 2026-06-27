@@ -23,6 +23,8 @@ const uploadRoutes = require('./routes/uploadRoutes');
 const cartRoutes = require('./routes/Cart');
 const orderRoutes = require('./routes/Order');
 const manageOrderRoutes = require('./routes/ManageOrder');
+const profileRoutes = require('./routes/Profile');
+const messageRoutes = require('./routes/Message');
 
 // Use routes
 app.use('/api/v1/users', userRoutes);
@@ -33,6 +35,8 @@ app.use('/api/v1/upload', uploadRoutes);
 app.use('/api/v1', cartRoutes);
 app.use('/api/v1', orderRoutes);
 app.use('/api/v1/manage-orders', manageOrderRoutes);
+app.use('/api/profile', profileRoutes);
+app.use('/api/messages', messageRoutes);
 
 // ========== HEALTH CHECK ENDPOINT ==========
 app.get('/api/v1/health', (req, res) => {

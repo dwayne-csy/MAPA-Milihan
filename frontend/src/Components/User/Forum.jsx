@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom'; // Add this import
 import axios from 'axios';
 import Header from '../layouts/Header';
 
@@ -56,8 +57,9 @@ const compareUserId = (id1, id2) => {
 };
 
 const UserForum = () => {
+  const navigate = useNavigate(); // Add useNavigate hook
   const [user, setUser] = useState(null);
-  const [userId, setUserId] = useState(null); // Store user ID separately
+  const [userId, setUserId] = useState(null);
   const [posts, setPosts] = useState([]);
   const [selectedPost, setSelectedPost] = useState(null);
   const [newPost, setNewPost] = useState({ 
@@ -122,10 +124,8 @@ const UserForum = () => {
       }
     }
     
-    // Extract user ID from JWT token
     if (token) {
       try {
-        // JWT tokens are base64 encoded, we can decode the payload
         const tokenParts = token.split('.');
         if (tokenParts.length === 3) {
           const payload = JSON.parse(atob(tokenParts[1]));
@@ -140,9 +140,7 @@ const UserForum = () => {
       }
     }
     
-    // If token doesn't have ID, try to get it from the user object
     if (!userId) {
-      // Try to get ID from user object
       const id = userData?._id || userData?.id || userData?.userId;
       if (id) {
         setUserId(id);
@@ -156,6 +154,13 @@ const UserForum = () => {
       fetchPosts();
     }
   }, [user, userId]);
+
+  // Function to navigate to user profile
+  const navigateToProfile = (userId) => {
+    if (userId) {
+      navigate(`/profile/${userId}`);
+    }
+  };
 
   // Fetch posts
   const fetchPosts = async (pageNum = 1) => {
@@ -1012,7 +1017,6 @@ const UserForum = () => {
 
   // Render comment with nested replies
   const renderCommentTree = (post, comment, depth = 0) => {
-    // Use userId from state (extracted from token)
     const currentUserId = userId;
     const commentAuthorId = comment.author?.userId;
     const postAuthorId = post.author?.userId;
@@ -1031,8 +1035,11 @@ const UserForum = () => {
     return (
       <div key={comment._id || comment.createdAt} className={`${isReply ? 'ml-8 mt-2' : 'mt-3'}`}>
         <div className="flex gap-3">
-          {/* Comment Avatar */}
-          <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-xs flex-shrink-0 overflow-hidden">
+          {/* Comment Avatar - Clickable */}
+          <div 
+            className="w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-xs flex-shrink-0 overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={() => navigateToProfile(comment.author?.userId)}
+          >
             {avatarUrl ? (
               <img 
                 src={avatarUrl} 
@@ -1043,7 +1050,7 @@ const UserForum = () => {
                   const parent = e.target.parentElement;
                   const initial = getInitial(comment.author.name);
                   const color = getDefaultAvatarColor(comment.author?.userType || 'User');
-                  parent.className = `w-8 h-8 rounded-full ${color} flex items-center justify-center text-white font-semibold text-xs flex-shrink-0`;
+                  parent.className = `w-8 h-8 rounded-full ${color} flex items-center justify-center text-white font-semibold text-xs flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity`;
                   parent.textContent = initial;
                 }}
               />
@@ -1057,7 +1064,13 @@ const UserForum = () => {
           <div className="flex-1 bg-gray-50 p-3 rounded-lg">
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <strong className="text-sm text-gray-700">{comment.author.name}</strong>
+                {/* Comment Author Name - Clickable */}
+                <strong 
+                  className="text-sm text-gray-700 cursor-pointer hover:text-blue-600 transition-colors"
+                  onClick={() => navigateToProfile(comment.author?.userId)}
+                >
+                  {comment.author.name}
+                </strong>
                 <span className="text-xs text-gray-500">{new Date(comment.createdAt).toLocaleDateString()}</span>
                 {comment.author.userType === 'Admin' && (
                   <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">Admin</span>
@@ -1446,30 +1459,23 @@ const UserForum = () => {
           )}
           
           {posts.map(post => {
-            // Use userId from state (extracted from token)
             const currentUserId = userId;
             const postAuthorId = post.author?.userId;
             const isPostOwner = currentUserId && postAuthorId && compareUserId(currentUserId, postAuthorId);
             
-            // Debug log
-            console.log('🔍 Post ownership check:', {
-              postId: post._id,
-              postTitle: post.title,
-              currentUserId: currentUserId,
-              postAuthorId: postAuthorId,
-              isPostOwner: isPostOwner
-            });
-            
             const postAvatarUrl = getUserAvatarUrl(post.author);
             const postAvatarColor = getDefaultAvatarColor(post.author?.userType || 'User');
             
-            // Get the correct user type display
             const userTypeDisplay = post.author?.userType || 'User';
             
             return (
               <div key={post._id} className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow duration-200">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0 overflow-hidden">
+                  {/* Post Author Avatar - Clickable */}
+                  <div 
+                    className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0 overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={() => navigateToProfile(post.author?.userId)}
+                  >
                     {postAvatarUrl ? (
                       <img 
                         src={postAvatarUrl} 
@@ -1480,7 +1486,7 @@ const UserForum = () => {
                           const parent = e.target.parentElement;
                           const initial = getInitial(post.author.name);
                           const color = getDefaultAvatarColor(post.author?.userType || 'User');
-                          parent.className = `w-10 h-10 rounded-full ${color} flex items-center justify-center text-white font-semibold text-sm flex-shrink-0`;
+                          parent.className = `w-10 h-10 rounded-full ${color} flex items-center justify-center text-white font-semibold text-sm flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity`;
                           parent.textContent = initial;
                         }}
                       />
@@ -1491,7 +1497,13 @@ const UserForum = () => {
                     )}
                   </div>
                   <div className="flex-1">
-                    <p className="font-semibold text-gray-800">{post.author.name}</p>
+                    {/* Post Author Name - Clickable */}
+                    <p 
+                      className="font-semibold text-gray-800 cursor-pointer hover:text-blue-600 transition-colors"
+                      onClick={() => navigateToProfile(post.author?.userId)}
+                    >
+                      {post.author.name}
+                    </p>
                     <div className="flex items-center gap-2 text-xs text-gray-500">
                       <span className={userTypeDisplay === 'Farmer' ? 'text-emerald-600 font-medium' : ''}>
                         {userTypeDisplay}
@@ -1504,7 +1516,6 @@ const UserForum = () => {
                     <span className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-xs font-medium">
                       {post.category}
                     </span>
-                    {/* EDIT AND DELETE BUTTONS FOR POST OWNER */}
                     {isPostOwner && (
                       <>
                         <button
