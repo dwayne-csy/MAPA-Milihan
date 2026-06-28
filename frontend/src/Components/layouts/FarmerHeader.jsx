@@ -82,7 +82,7 @@ const FarmerHeader = () => {
     { 
       label: 'Messages', // Added Message button
       icon: MessageIcon,
-      action: handleMessage
+      action: () => navigate('/farmer/messages')
     },
     { 
       label: 'Edit Profile', 

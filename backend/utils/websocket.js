@@ -11,6 +11,7 @@ class WebSocketServer {
     });
     this.clients = new Map(); // userId -> Set of WebSocket connections
     this.userStatus = new Map(); // userId -> boolean (online status)
+    this.callRooms = new Map(); // callId -> { participants: Set, offer: null, answer: null, iceCandidates: [] }
     this.init();
   }
 
@@ -148,11 +149,217 @@ class WebSocketServer {
       case 'read_receipt':
         await this.broadcastReadReceipt(data);
         break;
+
+      // WebRTC Signaling
+      case 'call_offer':
+        await this.handleCallOffer(userId, ws, data);
+        break;
+
+      case 'call_answer':
+        await this.handleCallAnswer(userId, ws, data);
+        break;
+
+      case 'call_ice_candidate':
+        await this.handleCallIceCandidate(userId, ws, data);
+        break;
+
+      case 'call_end':
+        await this.handleCallEnd(userId, ws, data);
+        break;
       
       default:
         console.log('Unknown message type:', data.type);
     }
   }
+
+  // ===== WebRTC Signaling Methods =====
+
+  async handleCallOffer(userId, ws, data) {
+    const { targetUserId, callId, offer, callType, callerName, callerAvatar } = data;
+    
+    console.log(`📞 Call offer from ${userId} to ${targetUserId}, callId: ${callId}`);
+
+    // Store call room
+    if (!this.callRooms.has(callId)) {
+      this.callRooms.set(callId, {
+        participants: new Set([userId, targetUserId]),
+        offer: offer,
+        answer: null,
+        iceCandidates: [],
+        callType: callType,
+        initiator: userId
+      });
+    }
+
+    // Forward offer to target user
+    const targetClients = this.clients.get(targetUserId);
+    if (targetClients && targetClients.size > 0) {
+      const message = JSON.stringify({
+        type: 'call_offer',
+        callId,
+        offer,
+        callerId: userId,
+        callType,
+        callerName: callerName || 'User',
+        callerAvatar: callerAvatar || null
+      });
+      
+      targetClients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(message);
+          console.log(`📞 Call offer sent to client for user ${targetUserId}`);
+        }
+      });
+      console.log(`📞 Call offer forwarded to ${targetUserId}`);
+    } else {
+      console.log(`⚠️ Target user ${targetUserId} is not online`);
+      // Send error back to caller
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'call_error',
+          message: 'User is not online'
+        }));
+      }
+    }
+  }
+
+  async handleCallAnswer(userId, ws, data) {
+    const { callId, answer, targetUserId } = data;
+    
+    console.log(`📞 Call answer from ${userId}, callId: ${callId}`);
+
+    const callRoom = this.callRooms.get(callId);
+    if (!callRoom) {
+      console.log(`⚠️ Call room ${callId} not found`);
+      return;
+    }
+
+    callRoom.answer = answer;
+
+    // Forward answer to initiator
+    const initiatorId = callRoom.initiator;
+    const initiatorClients = this.clients.get(initiatorId);
+    if (initiatorClients && initiatorClients.size > 0) {
+      const message = JSON.stringify({
+        type: 'call_answer',
+        callId,
+        answer,
+        answererId: userId
+      });
+      
+      initiatorClients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(message);
+          console.log(`📞 Call answer sent to client for user ${initiatorId}`);
+        }
+      });
+      console.log(`📞 Call answer forwarded to ${initiatorId}`);
+    } else {
+      console.log(`⚠️ Initiator ${initiatorId} is not online`);
+    }
+  }
+
+  async handleCallIceCandidate(userId, ws, data) {
+    const { callId, candidate, targetUserId } = data;
+    
+    console.log(`🧊 ICE candidate from ${userId}, callId: ${callId}`);
+
+    // Forward ICE candidate to target user
+    if (targetUserId) {
+      const targetClients = this.clients.get(targetUserId);
+      if (targetClients && targetClients.size > 0) {
+        const message = JSON.stringify({
+          type: 'call_ice_candidate',
+          callId,
+          candidate,
+          senderId: userId
+        });
+        
+        targetClients.forEach(client => {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(message);
+          }
+        });
+        console.log(`🧊 ICE candidate forwarded to ${targetUserId}`);
+      }
+    } else {
+      // If no specific target, broadcast to all participants in the call
+      const callRoom = this.callRooms.get(callId);
+      if (callRoom) {
+        const message = JSON.stringify({
+          type: 'call_ice_candidate',
+          callId,
+          candidate,
+          senderId: userId
+        });
+        
+        callRoom.participants.forEach(participantId => {
+          if (participantId !== userId) {
+            const participantClients = this.clients.get(participantId);
+            if (participantClients) {
+              participantClients.forEach(client => {
+                if (client.readyState === WebSocket.OPEN) {
+                  client.send(message);
+                }
+              });
+            }
+          }
+        });
+      }
+    }
+  }
+
+  async handleCallEnd(userId, ws, data) {
+    const { callId, targetUserId } = data;
+    
+    console.log(`📞 Call ended by ${userId}, callId: ${callId}`);
+
+    // Notify target user
+    if (targetUserId) {
+      const targetClients = this.clients.get(targetUserId);
+      if (targetClients) {
+        const message = JSON.stringify({
+          type: 'call_end',
+          callId,
+          endedBy: userId
+        });
+        
+        targetClients.forEach(client => {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(message);
+          }
+        });
+      }
+    }
+
+    // Also notify all participants
+    const callRoom = this.callRooms.get(callId);
+    if (callRoom) {
+      const message = JSON.stringify({
+        type: 'call_end',
+        callId,
+        endedBy: userId
+      });
+      
+      callRoom.participants.forEach(participantId => {
+        if (participantId !== userId) {
+          const participantClients = this.clients.get(participantId);
+          if (participantClients) {
+            participantClients.forEach(client => {
+              if (client.readyState === WebSocket.OPEN) {
+                client.send(message);
+              }
+            });
+          }
+        }
+      });
+    }
+
+    // Remove call room
+    this.callRooms.delete(callId);
+  }
+
+  // ===== Existing Methods =====
 
   async broadcastTypingStatus(userId, data) {
     const { conversationId, isTyping } = data;

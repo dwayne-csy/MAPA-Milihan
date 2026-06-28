@@ -1,5 +1,5 @@
 import React from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from "react-router-dom";
 import { getUser, isAuthenticated } from "./Components/utils/helper";
 import ProtectedRoute from './Components/ProtectedRoute';
 import Login from "./Components/Auth/Login";
@@ -30,30 +30,21 @@ import OrderList from './Components/Farmer/orders/OrderList';
 import ViewOrder from './Components/Farmer/orders/ViewOrder';
 import UProfile from "./Components/User/UProfile";
 import FProfile from "./Components/Farmer/FProfile";
-// Import Message components
 import UserMessage from "./Components/User/Message";
 import FarmerMessage from "./Components/Farmer/FarmerMessage";
+import Call from "./Components/User/Call";
+import FarmerCall from "./Components/Farmer/FarmerCall";
 
 // Profile wrapper component to determine which profile to show
 const ProfileWrapper = () => {
+  const { userId } = useParams();
   const user = getUser();
   const role = user?.role || 'user';
   
   if (role === 'farmer') {
-    return <FProfile />;
+    return <FProfile userId={userId} />;
   }
-  return <UProfile />;
-};
-
-// Message wrapper component to determine which message view to show
-const MessageWrapper = () => {
-  const user = getUser();
-  const role = user?.role || 'user';
-  
-  if (role === 'farmer') {
-    return <FarmerMessage />;
-  }
-  return <UserMessage />;
+  return <UProfile userId={userId} />;
 };
 
 const App = () => {
@@ -93,9 +84,10 @@ const App = () => {
         <Route path="/orders" element={<ProtectedRoute requiredRole="user"><OrderHistory /></ProtectedRoute>} />
         <Route path="/orders/:orderId" element={<ProtectedRoute requiredRole="user"><OrderDetails /></ProtectedRoute>} />
         
-        {/* User Messages Route - IMPORTANT: These must be above the catch-all */}
-        <Route path="/messages" element={<ProtectedRoute><MessageWrapper /></ProtectedRoute>} />
-        <Route path="/messages/:userId" element={<ProtectedRoute><MessageWrapper /></ProtectedRoute>} />
+        {/* User Messages Route */}
+        <Route path="/messages" element={<ProtectedRoute><UserMessage /></ProtectedRoute>} />
+        <Route path="/messages/:userId" element={<ProtectedRoute><UserMessage /></ProtectedRoute>} />
+        <Route path="/call/:userId" element={<ProtectedRoute><Call /></ProtectedRoute>} />
         
         {/* Farmer Protected Routes */}
         <Route path="/farmer/dashboard" element={<ProtectedRoute requiredRole="farmer"><Dashboard /></ProtectedRoute>} />
@@ -111,6 +103,7 @@ const App = () => {
         {/* Farmer Messages Route */}
         <Route path="/farmer/messages" element={<ProtectedRoute requiredRole="farmer"><FarmerMessage /></ProtectedRoute>} />
         <Route path="/farmer/messages/:userId" element={<ProtectedRoute requiredRole="farmer"><FarmerMessage /></ProtectedRoute>} />
+        <Route path="/farmer/call/:userId" element={<ProtectedRoute requiredRole="farmer"><FarmerCall /></ProtectedRoute>} />
 
         {/* Admin Protected Routes */}
         <Route path="/admin/dashboard" element={<ProtectedRoute requiredRole="admin"><AdminDashboard /></ProtectedRoute>} />

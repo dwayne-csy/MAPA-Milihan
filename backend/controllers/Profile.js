@@ -7,20 +7,26 @@ exports.getProfile = async (req, res) => {
   try {
     const { userId } = req.params;
     
+    console.log('📡 Fetching profile for userId:', userId);
+    
     // Get user data - only what's needed
     const user = await User.findById(userId)
       .select('name email avatar contact address role isVerified createdAt');
     
     if (!user) {
+      console.log('❌ User not found:', userId);
       return res.status(404).json({ 
         success: false,
         message: 'User not found' 
       });
     }
 
+    console.log('✅ User found:', user.name);
+
     // Get or create profile
     let profile = await Profile.findOne({ userId });
     if (!profile) {
+      console.log('🆕 Creating new profile for user:', userId);
       profile = new Profile({ userId });
       await profile.save();
     }
@@ -34,10 +40,7 @@ exports.getProfile = async (req, res) => {
 
     // Format posts to include author name and avatar
     const formattedPosts = posts.map(post => {
-      // Get author data from the post
       const authorData = post.author || {};
-      
-      // If author has userId, try to get the full user data
       let authorName = authorData.name || 'Unknown User';
       let authorAvatar = authorData.avatar || '/default-avatar.png';
       
@@ -88,12 +91,13 @@ exports.getProfile = async (req, res) => {
       isOwnProfile: isOwnProfile
     };
 
+    console.log('✅ Profile data sent successfully');
     res.status(200).json({
       success: true,
       data: profileData
     });
   } catch (error) {
-    console.error('Error fetching profile:', error);
+    console.error('❌ Error fetching profile:', error);
     res.status(500).json({ 
       success: false,
       message: 'Server error',

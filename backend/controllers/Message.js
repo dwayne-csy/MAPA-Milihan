@@ -1,10 +1,12 @@
+// Mapa-Milihan/backend/controllers/Message.js
 const { Message } = require('../models/Message');
-const { uploadToCloudinary, deleteFromCloudinary } = require('../utils/cloudinary');
+const { uploadToCloudinary } = require('../utils/cloudinary');
+const mongoose = require('mongoose');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-// WebSocket server instance (will be set from server.js)
+// WebSocket server instance
 let wsServer = null;
 
 // Function to set WebSocket server instance
@@ -12,7 +14,6 @@ exports.setWebSocketServer = (server) => {
   wsServer = server;
   console.log('✅ WebSocket server instance set in Message controller');
 };
-
 
 // Helper: Upload files to Cloudinary
 const uploadFilesToCloudinary = async (files, folder = 'Mapa-Milihan/messages') => {
@@ -123,6 +124,20 @@ const getUserTypeFromRole = (user) => {
   return 'User';
 };
 
+// Helper: Check if ID is valid ObjectId
+const isValidObjectId = (id) => {
+  return mongoose.Types.ObjectId.isValid(id);
+};
+
+// Helper: Get ID string from object or string
+const getIdString = (id) => {
+  if (!id) return null;
+  if (typeof id === 'string') return id;
+  if (typeof id === 'object' && id._id) return id._id.toString();
+  if (typeof id === 'object' && id.toString) return id.toString();
+  return null;
+};
+
 // ========== SEND MESSAGE ==========
 exports.sendMessage = async (req, res) => {
   try {
@@ -132,28 +147,52 @@ exports.sendMessage = async (req, res) => {
     const senderType = getUserTypeFromRole(req.user);
     const senderName = req.user.name || req.user.username || 'User';
 
+    console.log(`📨 Sending message from ${senderId} to ${receiverId}`);
+    console.log(`📨 Sender type: ${senderType}, Receiver type: ${receiverType}`);
+
     if (!receiverId || !receiverType) {
+      console.log('❌ Missing receiverId or receiverType');
       return res.status(400).json({
         success: false,
         message: 'Receiver ID and type are required'
       });
     }
 
+    // Normalize receiverType to proper case
+    const validTypes = ['User', 'Farmer', 'Admin'];
+    let normalizedReceiverType = receiverType;
+    
+    // Check if receiverType is valid (case insensitive)
+    const foundType = validTypes.find(t => t.toLowerCase() === receiverType.toLowerCase());
+    if (foundType) {
+      normalizedReceiverType = foundType;
+      console.log(`📨 Normalized receiverType from "${receiverType}" to "${normalizedReceiverType}"`);
+    } else if (!validTypes.includes(receiverType)) {
+      console.log(`❌ Invalid receiverType: ${receiverType}`);
+      return res.status(400).json({
+        success: false,
+        message: `Invalid receiverType. Must be one of: ${validTypes.join(', ')}`
+      });
+    }
+
+    const finalReceiverType = normalizedReceiverType;
+
     // Check if user is blocked
     let conversation = await Message.findOne({
       participants: {
         $all: [
           { $elemMatch: { userId: senderId, userType: senderType } },
-          { $elemMatch: { userId: receiverId, userType: receiverType } }
+          { $elemMatch: { userId: receiverId, userType: finalReceiverType } }
         ]
       }
     });
 
     if (conversation) {
       // Check if receiver has blocked sender
-      const receiverParticipant = conversation.participants.find(
-        p => p.userId.toString() === receiverId.toString()
-      );
+      const receiverParticipant = conversation.participants.find(p => {
+        const pUserId = getIdString(p.userId);
+        return pUserId === receiverId.toString();
+      });
       
       if (receiverParticipant && receiverParticipant.isBlocked) {
         return res.status(403).json({
@@ -167,6 +206,7 @@ exports.sendMessage = async (req, res) => {
     let mediaUrls = [];
 
     if (files && files.length > 0) {
+      console.log(`📤 Processing ${files.length} files`);
       const uploadedFiles = await uploadFilesToCloudinary(files, 'mapa-milihan/messages');
       if (uploadedFiles && uploadedFiles.length > 0) {
         mediaUrls = uploadedFiles;
@@ -174,6 +214,7 @@ exports.sendMessage = async (req, res) => {
     }
 
     if (!conversation) {
+      console.log(`📨 Creating new conversation between ${senderId} and ${receiverId}`);
       conversation = new Message({
         participants: [
           {
@@ -184,7 +225,7 @@ exports.sendMessage = async (req, res) => {
           },
           {
             userId: receiverId,
-            userType: receiverType,
+            userType: finalReceiverType,
             name: receiverName || 'User',
             avatar: null
           }
@@ -208,25 +249,29 @@ exports.sendMessage = async (req, res) => {
     }
 
     const message = {
-      senderId,
-      senderType,
-      senderName,
+      senderId: senderId,
+      senderType: senderType,
+      senderName: senderName,
       content: content || '',
       media: mediaUrls,
       isRead: false,
-      replyTo,
+      replyTo: replyTo,
       callType: callType || 'none',
       callStatus: callStatus || 'none',
       callDuration: callDuration || 0,
-      createdAt: Date.now(),
-      updatedAt: Date.now()
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
 
-    conversation.messages.push(message);
-    conversation.lastMessageAt = Date.now();
-    await conversation.save();
+    console.log(`📨 Adding message to conversation`);
 
-    // Populate the conversation with user details
+    conversation.messages.push(message);
+    conversation.lastMessageAt = new Date();
+    
+    await conversation.save();
+    console.log(`✅ Message saved with ID: ${message._id}`);
+
+    // Populate the conversation with user details for response
     const populatedConversation = await Message.findById(conversation._id)
       .populate('participants.userId', 'name email avatar')
       .lean();
@@ -236,14 +281,12 @@ exports.sendMessage = async (req, res) => {
 
     // 🔥 Send real-time notification via WebSocket
     if (wsServer) {
-    try {
+      try {
         wsServer.notifyNewMessage(conversation._id.toString(), sentMessage);
         console.log(`📨 WebSocket notification sent for message ${sentMessage._id}`);
-    } catch (wsError) {
+      } catch (wsError) {
         console.error('❌ Error sending WebSocket notification:', wsError);
-    }
-    } else {
-    console.log('⚠️ WebSocket server not available, skipping real-time notification');
+      }
     }
 
     res.status(201).json({
@@ -252,7 +295,8 @@ exports.sendMessage = async (req, res) => {
       data: populatedConversation
     });
   } catch (error) {
-    console.error('Send message error:', error);
+    console.error('❌ Send message error:', error);
+    console.error('Error stack:', error.stack);
     res.status(500).json({
       success: false,
       message: 'Error sending message',
@@ -267,6 +311,8 @@ exports.getConversations = async (req, res) => {
     const userId = req.user.id;
     const userType = getUserTypeFromRole(req.user);
 
+    console.log(`📨 Fetching conversations for user: ${userId}, type: ${userType}`);
+
     const conversations = await Message.find({
       'participants': {
         $elemMatch: {
@@ -275,49 +321,89 @@ exports.getConversations = async (req, res) => {
         }
       }
     })
-      .sort({ lastMessageAt: -1 })
-      .populate('participants.userId', 'name email avatar')
-      .lean();
+    .sort({ lastMessageAt: -1 })
+    .lean();
 
-    // Process conversations
+    console.log(`📨 Found ${conversations.length} conversations`);
+
     const processedConversations = conversations.map(conv => {
-      // Get unread count for this user
-      const unreadCount = conv.messages.filter(msg => 
-        msg.senderId && 
-        msg.senderId.toString() !== userId.toString() && 
-        !msg.isRead
-      ).length;
+      try {
+        // Get unread count for this user
+        const unreadCount = conv.messages ? conv.messages.filter(msg => {
+          const msgSenderId = getIdString(msg.senderId);
+          return msgSenderId && msgSenderId !== userId.toString() && !msg.isRead;
+        }).length : 0;
 
-      // Get last message
-      const lastMessage = conv.messages.length > 0 ? conv.messages[conv.messages.length - 1] : null;
+        // Get last message
+        const lastMessage = conv.messages && conv.messages.length > 0 ? conv.messages[conv.messages.length - 1] : null;
 
-      // Get other participant
-      const otherParticipant = conv.participants.find(
-        p => p.userId && p.userId._id && p.userId._id.toString() !== userId.toString()
-      );
+        // Get other participant
+        let otherParticipant = null;
+        for (const p of conv.participants || []) {
+          const pUserId = getIdString(p.userId);
+          if (pUserId && pUserId !== userId.toString()) {
+            otherParticipant = {
+              userId: {
+                _id: pUserId,
+                name: p.userId?.name || p.name || 'User',
+                email: p.userId?.email || null,
+                avatar: p.userId?.avatar || p.avatar || null
+              },
+              userType: p.userType,
+              name: p.name || 'User',
+              avatar: p.avatar || null,
+              isBlocked: p.isBlocked || false
+            };
+            break;
+          }
+        }
 
-      // Check if user is blocked
-      const isBlocked = conv.participants.some(
-        p => p.userId && p.userId._id && 
-        p.userId._id.toString() === userId.toString() && 
-        p.isBlocked
-      );
+        // Check if user is blocked
+        let isBlocked = false;
+        for (const p of conv.participants || []) {
+          const pUserId = getIdString(p.userId);
+          if (pUserId === userId.toString()) {
+            isBlocked = p.isBlocked || false;
+            break;
+          }
+        }
 
-      return {
-        ...conv,
-        unreadCount,
-        lastMessage,
-        otherParticipant: otherParticipant || null,
-        isBlocked
-      };
+        return {
+          _id: conv._id,
+          participants: conv.participants || [],
+          messages: conv.messages || [],
+          lastMessageAt: conv.lastMessageAt || new Date(),
+          lastMessage,
+          unreadCount,
+          otherParticipant,
+          isBlocked,
+          createdAt: conv.createdAt || new Date(),
+          updatedAt: conv.updatedAt || new Date()
+        };
+      } catch (err) {
+        console.error('Error processing conversation:', err, conv._id);
+        return {
+          _id: conv._id,
+          participants: conv.participants || [],
+          messages: [],
+          lastMessageAt: conv.lastMessageAt || new Date(),
+          unreadCount: 0,
+          otherParticipant: null,
+          isBlocked: false,
+          error: true
+        };
+      }
     });
+
+    console.log(`✅ Successfully processed ${processedConversations.length} conversations`);
 
     res.status(200).json({
       success: true,
       data: processedConversations
     });
   } catch (error) {
-    console.error('Get conversations error:', error);
+    console.error('❌ Get conversations error:', error);
+    console.error('Error stack:', error.stack);
     res.status(500).json({
       success: false,
       message: 'Error fetching conversations',
@@ -334,44 +420,65 @@ exports.getConversationMessages = async (req, res) => {
     const limit = parseInt(req.query.limit) || 50;
     const before = req.query.before;
 
-    const conversation = await Message.findById(conversationId)
-      .populate('participants.userId', 'name email avatar');
+    console.log(`📨 Fetching messages for conversation: ${conversationId} for user: ${userId}`);
+
+    if (!isValidObjectId(conversationId)) {
+      console.log(`❌ Invalid conversation ID format: ${conversationId}`);
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid conversation ID format'
+      });
+    }
+
+    const conversation = await Message.findById(conversationId);
 
     if (!conversation) {
+      console.log(`❌ Conversation not found: ${conversationId}`);
       return res.status(404).json({
         success: false,
         message: 'Conversation not found'
       });
     }
 
-    const isParticipant = conversation.participants.some(p => 
-      p.userId && p.userId._id && p.userId._id.toString() === userId.toString()
-    );
+    console.log(`📨 Found conversation with ${conversation.messages.length} messages`);
+
+    // Check if user is a participant
+    let isParticipant = false;
+    let userIsBlocked = false;
+    
+    for (const p of conversation.participants) {
+      const pUserId = getIdString(p.userId);
+      if (pUserId === userId.toString()) {
+        isParticipant = true;
+        userIsBlocked = p.isBlocked || false;
+        break;
+      }
+    }
 
     if (!isParticipant) {
+      console.log(`❌ User ${userId} is not a participant in conversation ${conversationId}`);
       return res.status(403).json({
         success: false,
         message: 'You are not a participant in this conversation'
       });
     }
 
-    // Check if user is blocked
-    const userParticipant = conversation.participants.find(
-      p => p.userId && p.userId._id && p.userId._id.toString() === userId.toString()
-    );
-    
-    if (userParticipant && userParticipant.isBlocked) {
+    if (userIsBlocked) {
+      console.log(`❌ User ${userId} is blocked in conversation ${conversationId}`);
       return res.status(403).json({
         success: false,
         message: 'You are blocked in this conversation'
       });
     }
 
-    // Query messages
-    let messages = conversation.messages;
+    // Get messages
+    let messages = conversation.messages || [];
     
     if (before) {
-      const beforeIndex = messages.findIndex(m => m._id.toString() === before);
+      const beforeIndex = messages.findIndex(m => {
+        const mId = getIdString(m._id);
+        return mId === before;
+      });
       if (beforeIndex > -1) {
         messages = messages.slice(0, beforeIndex);
       }
@@ -379,19 +486,28 @@ exports.getConversationMessages = async (req, res) => {
 
     // Filter out messages deleted for this user
     messages = messages.filter(msg => {
-      if (!msg.deletedFor) return true;
-      return !msg.deletedFor.some(d => d.userId && d.userId.toString() === userId.toString());
+      if (!msg.deletedFor || msg.deletedFor.length === 0) return true;
+      const isDeletedForUser = msg.deletedFor.some(d => {
+        const dUserId = getIdString(d.userId);
+        return dUserId === userId.toString();
+      });
+      return !isDeletedForUser;
     });
 
+    const totalMessages = messages.length;
     messages = messages.slice(-limit);
+
+    console.log(`📨 Returning ${messages.length} messages (filtered from ${totalMessages})`);
 
     // Mark messages as read
     let markedCount = 0;
     const readMessageIds = [];
     
     messages.forEach(msg => {
-      if (msg.senderId && 
-          msg.senderId.toString() !== userId.toString() && 
+      const msgSenderId = getIdString(msg.senderId);
+      
+      if (msgSenderId && 
+          msgSenderId !== userId.toString() && 
           !msg.isRead) {
         msg.isRead = true;
         msg.readAt = Date.now();
@@ -400,9 +516,21 @@ exports.getConversationMessages = async (req, res) => {
       }
     });
 
-    await conversation.save();
+    if (markedCount > 0) {
+      await conversation.save();
+      console.log(`📨 Marked ${markedCount} messages as read`);
+    }
 
-    // 🔥 Send read receipts via WebSocket
+    // Get populated conversation for response
+    const populatedConversation = await Message.findById(conversationId)
+      .populate('participants.userId', 'name email avatar')
+      .lean()
+      .catch(err => {
+        console.error('Error populating conversation:', err);
+        return conversation.toObject();
+      });
+
+    // Send read receipts via WebSocket
     if (wsServer && readMessageIds.length > 0) {
       try {
         readMessageIds.forEach(messageId => {
@@ -417,14 +545,15 @@ exports.getConversationMessages = async (req, res) => {
     res.status(200).json({
       success: true,
       data: {
-        conversation,
+        conversation: populatedConversation || conversation,
         messages: messages,
         markedAsRead: markedCount,
-        hasMore: conversation.messages.length > messages.length
+        hasMore: totalMessages > messages.length
       }
     });
   } catch (error) {
-    console.error('Get messages error:', error);
+    console.error('❌ Get messages error:', error);
+    console.error('Error stack:', error.stack);
     res.status(500).json({
       success: false,
       message: 'Error fetching messages',
@@ -439,6 +568,15 @@ exports.deleteMessage = async (req, res) => {
     const { conversationId, messageId } = req.params;
     const { deleteForEveryone } = req.body;
     const userId = req.user.id;
+
+    console.log(`🗑️ Deleting message ${messageId} from conversation ${conversationId}`);
+
+    if (!isValidObjectId(conversationId) || !isValidObjectId(messageId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid ID format'
+      });
+    }
 
     const conversation = await Message.findById(conversationId);
 
@@ -458,29 +596,25 @@ exports.deleteMessage = async (req, res) => {
       });
     }
 
-    // Check if user is the sender
-    const isSender = message.senderId.toString() === userId.toString();
+    const msgSenderId = getIdString(message.senderId);
+    const isSender = msgSenderId === userId.toString();
 
     if (deleteForEveryone) {
-      // Only sender can delete for everyone
       if (!isSender) {
         return res.status(403).json({
           success: false,
           message: 'You can only delete your own messages for everyone'
         });
       }
-      
-      // Delete message completely
       message.deleteOne();
     } else {
-      // Delete for me only
       if (!message.deletedFor) {
         message.deletedFor = [];
       }
-      // Check if already deleted for this user
-      const alreadyDeleted = message.deletedFor.some(
-        d => d.userId && d.userId.toString() === userId.toString()
-      );
+      const alreadyDeleted = message.deletedFor.some(d => {
+        const dUserId = getIdString(d.userId);
+        return dUserId === userId.toString();
+      });
       if (!alreadyDeleted) {
         message.deletedFor.push({
           userId: userId,
@@ -519,6 +653,13 @@ exports.addReaction = async (req, res) => {
       });
     }
 
+    if (!isValidObjectId(conversationId) || !isValidObjectId(messageId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid ID format'
+      });
+    }
+
     const conversation = await Message.findById(conversationId);
 
     if (!conversation) {
@@ -537,30 +678,26 @@ exports.addReaction = async (req, res) => {
       });
     }
 
-    // Check if user already reacted
     if (!message.reactions) {
       message.reactions = [];
     }
 
     const existingReaction = message.reactions.find(
-      r => r.userId && r.userId.toString() === userId.toString()
+      r => getIdString(r.userId) === userId.toString()
     );
 
     if (existingReaction) {
       if (existingReaction.reaction === reaction) {
-        // Remove reaction if same
         message.reactions = message.reactions.filter(
-          r => r.userId.toString() !== userId.toString()
+          r => getIdString(r.userId) !== userId.toString()
         );
       } else {
-        // Update reaction
         existingReaction.reaction = reaction;
         existingReaction.createdAt = Date.now();
       }
     } else {
-      // Add new reaction
       message.reactions.push({
-        userId,
+        userId: userId,
         reaction,
         createdAt: Date.now()
       });
@@ -597,7 +734,8 @@ exports.blockUser = async (req, res) => {
       });
     }
 
-    // Find conversation
+    console.log(`🔒 Blocking user ${blockUserId} by ${userId}`);
+
     let conversation = await Message.findOne({
       participants: {
         $all: [
@@ -608,7 +746,6 @@ exports.blockUser = async (req, res) => {
     });
 
     if (!conversation) {
-      // Create a new conversation if it doesn't exist
       conversation = new Message({
         participants: [
           {
@@ -626,24 +763,23 @@ exports.blockUser = async (req, res) => {
       });
     }
 
-    // Update participant status
-    const participantToBlock = conversation.participants.find(
-      p => p.userId.toString() === blockUserId.toString()
-    );
+    const participantToBlock = conversation.participants.find(p => {
+      const pUserId = getIdString(p.userId);
+      return pUserId === blockUserId.toString();
+    });
 
     if (participantToBlock) {
       participantToBlock.isBlocked = true;
     }
 
-    // Add to blockedBy list
     if (!conversation.blockedBy) {
       conversation.blockedBy = [];
     }
 
-    // Check if already blocked
-    const alreadyBlocked = conversation.blockedBy.some(
-      b => b.userId && b.userId.toString() === userId.toString()
-    );
+    const alreadyBlocked = conversation.blockedBy.some(b => {
+      const bUserId = getIdString(b.userId);
+      return bUserId === userId.toString();
+    });
 
     if (!alreadyBlocked) {
       conversation.blockedBy.push({
@@ -678,6 +814,8 @@ exports.unblockUser = async (req, res) => {
     const userId = req.user.id;
     const userType = getUserTypeFromRole(req.user);
 
+    console.log(`🔓 Unblocking user ${unblockUserId} by ${userId}`);
+
     const conversation = await Message.findOne({
       participants: {
         $all: [
@@ -694,20 +832,20 @@ exports.unblockUser = async (req, res) => {
       });
     }
 
-    // Update participant status
-    const participant = conversation.participants.find(
-      p => p.userId.toString() === unblockUserId.toString()
-    );
+    const participant = conversation.participants.find(p => {
+      const pUserId = getIdString(p.userId);
+      return pUserId === unblockUserId.toString();
+    });
 
     if (participant) {
       participant.isBlocked = false;
     }
 
-    // Remove from blockedBy
     if (conversation.blockedBy) {
-      conversation.blockedBy = conversation.blockedBy.filter(
-        b => b.userId && b.userId.toString() !== userId.toString()
-      );
+      conversation.blockedBy = conversation.blockedBy.filter(b => {
+        const bUserId = getIdString(b.userId);
+        return bUserId !== userId.toString();
+      });
     }
 
     await conversation.save();
@@ -733,6 +871,13 @@ exports.markAsRead = async (req, res) => {
     const { conversationId } = req.params;
     const userId = req.user.id;
 
+    if (!isValidObjectId(conversationId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid conversation ID format'
+      });
+    }
+
     const conversation = await Message.findById(conversationId);
 
     if (!conversation) {
@@ -746,7 +891,8 @@ exports.markAsRead = async (req, res) => {
     const readMessageIds = [];
 
     conversation.messages.forEach(msg => {
-      if (msg.senderId && msg.senderId.toString() !== userId.toString() && !msg.isRead) {
+      const msgSenderId = getIdString(msg.senderId);
+      if (msgSenderId && msgSenderId !== userId.toString() && !msg.isRead) {
         msg.isRead = true;
         msg.readAt = Date.now();
         updatedCount++;
@@ -756,7 +902,6 @@ exports.markAsRead = async (req, res) => {
 
     await conversation.save();
 
-    // 🔥 Send read receipts via WebSocket
     if (wsServer && readMessageIds.length > 0) {
       try {
         readMessageIds.forEach(messageId => {
@@ -798,6 +943,13 @@ exports.reportMessage = async (req, res) => {
       });
     }
 
+    if (!isValidObjectId(conversationId) || !isValidObjectId(messageId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid ID format'
+      });
+    }
+
     const conversation = await Message.findById(conversationId);
 
     if (!conversation) {
@@ -816,13 +968,12 @@ exports.reportMessage = async (req, res) => {
       });
     }
 
-    // Check if already reported by this user
     if (!message.reports) {
       message.reports = [];
     }
 
     const alreadyReported = message.reports.some(
-      r => r.reportedBy && r.reportedBy.userId && r.reportedBy.userId.toString() === userId.toString()
+      r => getIdString(r.reportedBy?.userId) === userId.toString()
     );
 
     if (alreadyReported) {
@@ -876,9 +1027,10 @@ exports.getUnreadCount = async (req, res) => {
 
     let totalUnread = 0;
     const unreadDetails = conversations.map(conv => {
-      const unreadCount = conv.messages.filter(msg => 
-        msg.senderId && msg.senderId.toString() !== userId.toString() && !msg.isRead
-      ).length;
+      const unreadCount = conv.messages.filter(msg => {
+        const msgSenderId = getIdString(msg.senderId);
+        return msgSenderId && msgSenderId !== userId.toString() && !msg.isRead;
+      }).length;
       totalUnread += unreadCount;
       return {
         conversationId: conv._id,
@@ -903,6 +1055,118 @@ exports.getUnreadCount = async (req, res) => {
   }
 };
 
+// ========== SEND CALL MESSAGE ==========
+exports.sendCallMessage = async (req, res) => {
+  try {
+    const { receiverId, receiverType, receiverName, callType, callStatus, callDuration } = req.body;
+    const senderId = req.user.id;
+    
+    const senderType = getUserTypeFromRole(req.user);
+    const senderName = req.user.name || req.user.username || 'User';
+
+    console.log(`📞 Sending call message from ${senderId} to ${receiverId}`);
+    console.log(`📞 Call type: ${callType}, Status: ${callStatus}`);
+
+    if (!receiverId || !receiverType) {
+      return res.status(400).json({
+        success: false,
+        message: 'Receiver ID and type are required'
+      });
+    }
+
+    const validTypes = ['User', 'Farmer', 'Admin'];
+    let normalizedReceiverType = receiverType;
+    const foundType = validTypes.find(t => t.toLowerCase() === receiverType.toLowerCase());
+    if (foundType) {
+      normalizedReceiverType = foundType;
+    }
+
+    const finalReceiverType = normalizedReceiverType;
+
+    // Find or create conversation
+    let conversation = await Message.findOne({
+      participants: {
+        $all: [
+          { $elemMatch: { userId: senderId, userType: senderType } },
+          { $elemMatch: { userId: receiverId, userType: finalReceiverType } }
+        ]
+      }
+    });
+
+    if (!conversation) {
+      conversation = new Message({
+        participants: [
+          {
+            userId: senderId,
+            userType: senderType,
+            name: senderName,
+            avatar: req.user.avatar?.url || null
+          },
+          {
+            userId: receiverId,
+            userType: finalReceiverType,
+            name: receiverName || 'User',
+            avatar: null
+          }
+        ],
+        messages: [],
+        lastMessageAt: Date.now()
+      });
+    }
+
+    // Create call message
+    const message = {
+      senderId: senderId,
+      senderType: senderType,
+      senderName: senderName,
+      content: '',
+      media: [],
+      isRead: false,
+      replyTo: null,
+      callType: callType || 'audio',
+      callStatus: callStatus || 'missed',
+      callDuration: callDuration || 0,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    conversation.messages.push(message);
+    conversation.lastMessageAt = new Date();
+    
+    await conversation.save();
+    console.log(`✅ Call message saved with ID: ${message._id}`);
+
+    const populatedConversation = await Message.findById(conversation._id)
+      .populate('participants.userId', 'name email avatar')
+      .lean();
+
+    const sentMessage = populatedConversation.messages[populatedConversation.messages.length - 1];
+
+    // Send real-time notification via WebSocket
+    if (wsServer) {
+      try {
+        wsServer.notifyNewMessage(conversation._id.toString(), sentMessage);
+        console.log(`📨 WebSocket notification sent for call message ${sentMessage._id}`);
+      } catch (wsError) {
+        console.error('❌ Error sending WebSocket notification:', wsError);
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Call message sent successfully',
+      data: populatedConversation
+    });
+  } catch (error) {
+    console.error('❌ Send call message error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error sending call message',
+      error: error.message
+    });
+  }
+};
+
 // ========== GET CALL HISTORY ==========
 exports.getCallHistory = async (req, res) => {
   try {
@@ -920,7 +1184,7 @@ exports.getCallHistory = async (req, res) => {
       conv.messages.forEach(msg => {
         if (msg.callType && msg.callType !== 'none') {
           const otherParticipant = conv.participants.find(
-            p => p.userId && p.userId._id && p.userId._id.toString() !== userId.toString()
+            p => getIdString(p.userId?._id) !== userId.toString()
           );
           callHistory.push({
             conversationId: conv._id,
@@ -946,6 +1210,182 @@ exports.getCallHistory = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching call history',
+      error: error.message
+    });
+  }
+};
+
+// ========== GET OR CREATE CONVERSATION ==========
+exports.getOrCreateConversation = async (req, res) => {
+  try {
+    const { targetUserId, targetUserType, targetUserName } = req.body;
+    const userId = req.user.id;
+    const userType = getUserTypeFromRole(req.user);
+    const userName = req.user.name || req.user.username || 'User';
+
+    console.log(`📨 Getting or creating conversation between ${userId} (${userType}) and ${targetUserId} (${targetUserType})`);
+
+    if (!targetUserId || !targetUserType) {
+      return res.status(400).json({
+        success: false,
+        message: 'Target user ID and type are required'
+      });
+    }
+
+    // Check if trying to message yourself
+    if (targetUserId.toString() === userId.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot message yourself'
+      });
+    }
+
+    // Normalize targetUserType
+    const validTypes = ['User', 'Farmer', 'Admin'];
+    let normalizedTargetType = targetUserType;
+    const foundType = validTypes.find(t => t.toLowerCase() === targetUserType.toLowerCase());
+    if (foundType) {
+      normalizedTargetType = foundType;
+    }
+
+    // Get target user details if not provided or incomplete
+    let targetName = targetUserName || 'User';
+    let targetAvatar = null;
+    
+    try {
+      const User = mongoose.model('User');
+      const targetUser = await User.findById(targetUserId).select('name avatar userType role');
+      if (targetUser) {
+        targetName = targetUser.name || targetUserName || 'User';
+        targetAvatar = targetUser.avatar?.url || null;
+        // Use the user's actual role/type if available
+        if (targetUser.userType && validTypes.includes(targetUser.userType)) {
+          normalizedTargetType = targetUser.userType;
+        } else if (targetUser.role) {
+          // Map role to userType
+          if (targetUser.role === 'farmer') normalizedTargetType = 'Farmer';
+          else if (targetUser.role === 'admin') normalizedTargetType = 'Admin';
+          else normalizedTargetType = 'User';
+        }
+        console.log(`📨 Target user found: ${targetName} (${normalizedTargetType})`);
+      } else {
+        console.log(`⚠️ Target user not found in database: ${targetUserId}`);
+      }
+    } catch (err) {
+      console.log('Could not fetch target user details, using provided values:', err.message);
+    }
+
+    // Find existing conversation - IMPORTANT: Use the normalized types
+    let conversation = await Message.findOne({
+      participants: {
+        $all: [
+          { $elemMatch: { userId: userId, userType: userType } },
+          { $elemMatch: { userId: targetUserId, userType: normalizedTargetType } }
+        ]
+      }
+    });
+
+    if (!conversation) {
+      console.log(`📨 Creating new conversation between ${userId} and ${targetUserId}`);
+      
+      // Create a new conversation with proper participant data
+      const newConversation = new Message({
+        participants: [
+          {
+            userId: userId,
+            userType: userType,
+            name: userName,
+            avatar: req.user.avatar?.url || null
+          },
+          {
+            userId: targetUserId,
+            userType: normalizedTargetType,
+            name: targetName,
+            avatar: targetAvatar
+          }
+        ],
+        messages: [],
+        lastMessageAt: Date.now()
+      });
+
+      conversation = await newConversation.save();
+      console.log(`✅ New conversation created with ID: ${conversation._id}`);
+    } else {
+      console.log(`✅ Existing conversation found with ID: ${conversation._id}`);
+    }
+
+    // Populate and return the conversation
+    const populatedConversation = await Message.findById(conversation._id)
+      .populate('participants.userId', 'name email avatar')
+      .lean();
+
+    if (!populatedConversation) {
+      return res.status(500).json({
+        success: false,
+        message: 'Error retrieving conversation'
+      });
+    }
+
+    // Process conversation for response
+    const processedConv = {
+      _id: populatedConversation._id,
+      participants: populatedConversation.participants,
+      messages: populatedConversation.messages || [],
+      lastMessageAt: populatedConversation.lastMessageAt || new Date(),
+      lastMessage: populatedConversation.messages && populatedConversation.messages.length > 0 
+        ? populatedConversation.messages[populatedConversation.messages.length - 1] 
+        : null,
+      unreadCount: populatedConversation.messages ? populatedConversation.messages.filter(msg => {
+        const msgSenderId = getIdString(msg.senderId);
+        return msgSenderId && msgSenderId !== userId.toString() && !msg.isRead;
+      }).length : 0,
+      otherParticipant: null,
+      isBlocked: false,
+      createdAt: populatedConversation.createdAt || new Date(),
+      updatedAt: populatedConversation.updatedAt || new Date()
+    };
+
+    // Get other participant
+    for (const p of populatedConversation.participants) {
+      const pUserId = getIdString(p.userId);
+      if (pUserId && pUserId !== userId.toString()) {
+        processedConv.otherParticipant = {
+          userId: {
+            _id: pUserId,
+            name: p.userId?.name || p.name || 'User',
+            email: p.userId?.email || null,
+            avatar: p.userId?.avatar || p.avatar || null
+          },
+          userType: p.userType,
+          name: p.name || 'User',
+          avatar: p.avatar || null,
+          isBlocked: p.isBlocked || false
+        };
+        break;
+      }
+    }
+
+    // Check if user is blocked
+    for (const p of populatedConversation.participants) {
+      const pUserId = getIdString(p.userId);
+      if (pUserId === userId.toString()) {
+        processedConv.isBlocked = p.isBlocked || false;
+        break;
+      }
+    }
+
+    console.log(`📨 Returning conversation with ID: ${processedConv._id}`);
+
+    res.status(200).json({
+      success: true,
+      data: processedConv
+    });
+  } catch (error) {
+    console.error('❌ Get or create conversation error:', error);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({
+      success: false,
+      message: 'Error getting or creating conversation',
       error: error.message
     });
   }

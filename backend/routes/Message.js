@@ -1,3 +1,4 @@
+// Mapa-Milihan/backend/routes/Message.js
 const express = require('express');
 const router = express.Router();
 const messageController = require('../controllers/Message');
@@ -26,6 +27,13 @@ router.get(
   '/conversations/:id',
   isAuthenticatedUser,
   messageController.getConversationMessages
+);
+
+// Get or create a conversation with a specific user
+router.post(
+  '/conversations/get-or-create',
+  isAuthenticatedUser,
+  messageController.getOrCreateConversation
 );
 
 // Get unread message count
@@ -82,6 +90,13 @@ router.post(
 );
 
 // ===================== CALL ROUTES =====================
+
+// Send call message (missed/answered call)
+router.post(
+  '/call/message',
+  isAuthenticatedUser,
+  messageController.sendCallMessage
+);
 
 // Get call history
 router.get(

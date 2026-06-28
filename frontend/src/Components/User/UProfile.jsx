@@ -18,11 +18,12 @@ import {
   FaArrowLeft,
   FaImage,
   FaPlayCircle,
-  FaTimes
+  FaTimes,
+  FaStore
 } from 'react-icons/fa';
 import UserHeader from '../layouts/Header';
 
-// API Base URL - Match your backend port
+// API Base URL
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001';
 
 // Helper function to check if URL is video
@@ -50,6 +51,7 @@ const UProfile = () => {
   const [followingCount, setFollowingCount] = useState(0);
   const [posts, setPosts] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
+  const [isCreatingConversation, setIsCreatingConversation] = useState(false);
 
   // Modal states
   const [showModal, setShowModal] = useState(false);
@@ -126,8 +128,31 @@ const UProfile = () => {
     }
   };
 
-  const handleMessage = () => {
-    // Navigate to messages with the userId as a parameter
+  // Handle message button click - navigate to user messages with userId
+  const handleMessage = async () => {
+    // Check if trying to message yourself
+    if (currentUser && (userId === currentUser._id || userId === currentUser.id)) {
+      toast.warning("You cannot send messages to yourself");
+      return;
+    }
+    
+    // Check if the profile user exists
+    if (!profile || !profile.user) {
+      toast.error("User not found");
+      return;
+    }
+    
+    const profileUserId = profile.user.id || profile.user._id;
+
+    // Check if trying to message yourself using profile data
+    if (currentUser && profileUserId && 
+        (profileUserId === currentUser._id || profileUserId === currentUser.id)) {
+      toast.warning("You cannot send messages to yourself");
+      return;
+    }
+    
+    // Navigate to user messages with the userId as a parameter
+    // Message.jsx will handle creating the conversation if it doesn't exist
     navigate(`/messages/${userId}`);
   };
 
@@ -188,7 +213,6 @@ const UProfile = () => {
 
   // Helper function to get author name from post
   const getAuthorName = (post) => {
-    // Check multiple possible locations for the author name
     if (post.authorName) return post.authorName;
     if (post.author?.name) return post.author.name;
     if (post.author?.userId?.name) return post.author.userId.name;
@@ -198,7 +222,6 @@ const UProfile = () => {
 
   // Helper function to get author avatar from post
   const getAuthorAvatar = (post) => {
-    // Check multiple possible locations for the author avatar
     if (post.authorAvatar) return post.authorAvatar;
     if (post.author?.avatar) return post.author.avatar;
     if (post.author?.userId?.avatar) return post.author.userId.avatar;
@@ -324,7 +347,7 @@ const UProfile = () => {
             {/* Avatar */}
             <div className="flex-shrink-0 mx-auto md:mx-0">
               <img 
-                src={user.avatar?.url || '/default-avatar.png'} 
+                src={user.avatar?.url || user.avatar || '/default-avatar.png'} 
                 alt={user.name}
                 className="w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 rounded-full object-cover border-4 border-green-500"
                 onError={(e) => {
@@ -344,7 +367,12 @@ const UProfile = () => {
                   )}
                 </h1>
                 <div className="flex flex-wrap gap-2">
-                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-500 text-white">
+                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                    user.userType === 'Farmer' 
+                      ? 'bg-orange-500 text-white flex items-center gap-1' 
+                      : 'bg-blue-500 text-white'
+                  }`}>
+                    {user.userType === 'Farmer' && <FaStore className="text-xs" />}
                     {user.userType}
                   </span>
                 </div>

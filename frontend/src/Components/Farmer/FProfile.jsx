@@ -19,7 +19,8 @@ import {
   FaStore,
   FaImage,
   FaPlayCircle,
-  FaTimes
+  FaTimes,
+  FaUserCircle
 } from 'react-icons/fa';
 import FarmerHeader from '../layouts/FarmerHeader';
 
@@ -50,6 +51,7 @@ const FProfile = () => {
   const [followingCount, setFollowingCount] = useState(0);
   const [posts, setPosts] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
+  const [isCreatingConversation, setIsCreatingConversation] = useState(false);
 
   // Modal states
   const [showModal, setShowModal] = useState(false);
@@ -126,8 +128,32 @@ const FProfile = () => {
     }
   };
 
+  // Handle message button click - navigate to farmer messages with userId
   const handleMessage = () => {
-    navigate(`/messages/${userId}`);
+    // Check if trying to message yourself
+    if (currentUser && (userId === currentUser._id || userId === currentUser.id)) {
+      toast.warning("You cannot send messages to yourself");
+      return;
+    }
+    
+    // Check if the profile user exists
+    if (!profile || !profile.user) {
+      toast.error("User not found");
+      return;
+    }
+
+    const profileUserId = profile.user.id || profile.user._id;
+    
+    // Check if trying to message yourself using profile data
+    if (currentUser && profileUserId &&
+        (profileUserId === currentUser._id || profileUserId === currentUser.id)) {
+      toast.warning("You cannot send messages to yourself");
+      return;
+    }
+    
+    // Navigate to farmer messages with the userId as a parameter
+    // FarmerMessage.jsx will handle creating the conversation if it doesn't exist
+    navigate(`/farmer/messages/${userId}`);
   };
 
   // Handle edit profile navigation
@@ -183,6 +209,24 @@ const FProfile = () => {
     setShowModal(false);
     setModalUsers([]);
     setModalType('');
+  };
+
+  // Helper function to get author name from post
+  const getAuthorName = (post) => {
+    if (post.authorName) return post.authorName;
+    if (post.author?.name) return post.author.name;
+    if (post.author?.userId?.name) return post.author.userId.name;
+    if (post.userId?.name) return post.userId.name;
+    return 'Unknown User';
+  };
+
+  // Helper function to get author avatar from post
+  const getAuthorAvatar = (post) => {
+    if (post.authorAvatar) return post.authorAvatar;
+    if (post.author?.avatar) return post.author.avatar;
+    if (post.author?.userId?.avatar) return post.author.userId.avatar;
+    if (post.userId?.avatar) return post.userId.avatar;
+    return '/default-avatar.png';
   };
 
   // Render post media (image or video)
@@ -303,7 +347,7 @@ const FProfile = () => {
             {/* Avatar */}
             <div className="flex-shrink-0 mx-auto md:mx-0">
               <img 
-                src={user.avatar?.url || '/default-avatar.png'} 
+                src={user.avatar?.url || user.avatar || '/default-avatar.png'} 
                 alt={user.name}
                 className="w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 rounded-full object-cover border-4 border-green-500"
                 onError={(e) => {
@@ -323,8 +367,13 @@ const FProfile = () => {
                   )}
                 </h1>
                 <div className="flex flex-wrap gap-2">
-                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-orange-500 text-white flex items-center gap-1">
-                    <FaStore className="text-xs" /> {user.userType}
+                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                    user.userType === 'Farmer' 
+                      ? 'bg-orange-500 text-white flex items-center gap-1' 
+                      : 'bg-blue-500 text-white'
+                  }`}>
+                    {user.userType === 'Farmer' && <FaStore className="text-xs" />}
+                    {user.userType || 'Farmer'}
                   </span>
                 </div>
               </div>
@@ -434,28 +483,33 @@ const FProfile = () => {
             </div>
           ) : (
             <div className="space-y-5">
-              {posts.map((post) => (
-                <div key={post._id} className="border border-gray-200 rounded-lg p-5 hover:shadow-md transition-shadow">
-                  <div className="flex items-center gap-4 mb-4">
-                    <img 
-                      src={post.author?.avatar || '/default-avatar.png'} 
-                      alt={post.author?.name || 'User'}
-                      className="w-12 h-12 rounded-full object-cover"
-                      onError={(e) => {
-                        e.target.src = '/default-avatar.png';
-                      }}
-                    />
-                    <div className="flex-1">
-                      <h4 className="font-medium text-gray-800">{post.author?.name || 'Unknown User'}</h4>
-                      <span className="text-xs text-gray-500">{formatDate(post.createdAt)}</span>
+              {posts.map((post) => {
+                const authorName = getAuthorName(post);
+                const authorAvatar = getAuthorAvatar(post);
+                
+                return (
+                  <div key={post._id} className="border border-gray-200 rounded-lg p-5 hover:shadow-md transition-shadow">
+                    <div className="flex items-center gap-4 mb-4">
+                      <img 
+                        src={authorAvatar} 
+                        alt={authorName}
+                        className="w-12 h-12 rounded-full object-cover"
+                        onError={(e) => {
+                          e.target.src = '/default-avatar.png';
+                        }}
+                      />
+                      <div className="flex-1">
+                        <h4 className="font-medium text-gray-800">{authorName}</h4>
+                        <span className="text-xs text-gray-500">{formatDate(post.createdAt)}</span>
+                      </div>
+                    </div>
+                    <div className="mb-4">
+                      <p className="text-gray-700 leading-relaxed mb-3">{post.content}</p>
+                      {renderPostMedia(post.media)}
                     </div>
                   </div>
-                  <div className="mb-4">
-                    <p className="text-gray-700 leading-relaxed mb-3">{post.content}</p>
-                    {renderPostMedia(post.media)}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -504,7 +558,7 @@ const FProfile = () => {
                       }}
                     >
                       <img 
-                        src={user.avatar?.url || '/default-avatar.png'} 
+                        src={user.avatar?.url || user.avatar || '/default-avatar.png'} 
                         alt={user.name}
                         className="w-12 h-12 rounded-full object-cover"
                         onError={(e) => {
@@ -513,7 +567,7 @@ const FProfile = () => {
                       />
                       <div className="flex-1">
                         <div className="font-medium text-gray-800">{user.name}</div>
-                        <div className="text-xs text-gray-500">{user.userType || 'Farmer'}</div>
+                        <div className="text-xs text-gray-500">{user.userType || 'User'}</div>
                       </div>
                     </div>
                   ))}

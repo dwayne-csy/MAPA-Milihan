@@ -1,12 +1,27 @@
 const mongoose = require('mongoose');
 
+// Register Farmer and Admin as aliases for User model
+// This allows refPath to work without creating separate models
+try {
+  // Check if models are already registered to avoid duplicate registration errors
+  if (!mongoose.modelNames().includes('Farmer')) {
+    mongoose.model('Farmer', mongoose.model('User').schema);
+  }
+  if (!mongoose.modelNames().includes('Admin')) {
+    mongoose.model('Admin', mongoose.model('User').schema);
+  }
+} catch (e) {
+  // Models might already be registered or User model might not be loaded yet
+  console.log('Note: Farmer/Admin models will be registered when User model is available');
+}
+
 // Message Schema
 const messageSchema = new mongoose.Schema({
   participants: [{
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       required: true,
-      refPath: 'participants.userType'
+      refPath: 'participants.userType' // This will look for 'User', 'Farmer', or 'Admin' models
     },
     userType: {
       type: String,
@@ -29,7 +44,8 @@ const messageSchema = new mongoose.Schema({
   messages: [{
     senderId: {
       type: mongoose.Schema.Types.ObjectId,
-      required: true
+      required: true,
+      refPath: 'messages.senderType' // Add this to properly reference the sender
     },
     senderType: {
       type: String,
@@ -63,7 +79,7 @@ const messageSchema = new mongoose.Schema({
         type: String
       },
       duration: {
-        type: Number // For audio/video duration in seconds
+        type: Number
       },
       size: {
         type: Number
@@ -75,7 +91,6 @@ const messageSchema = new mongoose.Schema({
         type: String
       }
     }],
-    // Call-related fields
     callType: {
       type: String,
       enum: ['audio', 'video', 'none'],
@@ -90,7 +105,6 @@ const messageSchema = new mongoose.Schema({
       enum: ['missed', 'answered', 'rejected', 'cancelled', 'ongoing', 'none'],
       default: 'none'
     },
-    // Read receipt
     isRead: {
       type: Boolean,
       default: false
@@ -98,21 +112,20 @@ const messageSchema = new mongoose.Schema({
     readAt: {
       type: Date
     },
-    // Delete functionality
     isDeleted: {
       type: Boolean,
       default: false
     },
     deletedFor: [{
       userId: {
-        type: mongoose.Schema.Types.ObjectId
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
       },
       deletedAt: {
         type: Date,
         default: Date.now
       }
     }],
-    // Reply to message
     replyTo: {
       messageId: {
         type: mongoose.Schema.Types.ObjectId
@@ -128,11 +141,11 @@ const messageSchema = new mongoose.Schema({
         type: String
       }]
     },
-    // Reactions (like Instagram)
     reactions: [{
       userId: {
         type: mongoose.Schema.Types.ObjectId,
-        required: true
+        required: true,
+        ref: 'User'
       },
       reaction: {
         type: String,
@@ -144,7 +157,6 @@ const messageSchema = new mongoose.Schema({
         default: Date.now
       }
     }],
-    // Reports
     reports: [{
       reportedBy: {
         userId: {
@@ -187,7 +199,6 @@ const messageSchema = new mongoose.Schema({
       default: Date.now
     }
   }],
-  // Last message tracking
   lastMessageAt: {
     type: Date,
     default: Date.now
@@ -197,7 +208,12 @@ const messageSchema = new mongoose.Schema({
       type: String
     },
     senderId: {
-      type: mongoose.Schema.Types.ObjectId
+      type: mongoose.Schema.Types.ObjectId,
+      refPath: 'lastMessage.senderType'
+    },
+    senderType: {
+      type: String,
+      enum: ['User', 'Farmer', 'Admin']
     },
     senderName: {
       type: String
@@ -215,10 +231,10 @@ const messageSchema = new mongoose.Schema({
       type: String
     }
   },
-  // Block list
   blockedBy: [{
     userId: {
-      type: mongoose.Schema.Types.ObjectId
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
     },
     userType: {
       type: String,
@@ -244,68 +260,49 @@ const messageSchema = new mongoose.Schema({
 
 // ===================== INDEXES =====================
 
-// For finding conversations by participants
 messageSchema.index({ 'participants.userId': 1, 'participants.userType': 1 });
-
-// For sorting by last message
 messageSchema.index({ lastMessageAt: -1 });
-
-// For message reports
 messageSchema.index({ 'messages.reports.status': 1 });
-
-// For filtering messages by date
 messageSchema.index({ 'messages.createdAt': -1 });
-
-// For blocked participants
 messageSchema.index({ 'participants.isBlocked': 1 });
-
-// For blocked by
 messageSchema.index({ 'blockedBy.userId': 1 });
 
 // ===================== VIRTUALS =====================
 
-// Virtual for unread count
 messageSchema.virtual('unreadCount').get(function() {
   return this.messages.filter(msg => !msg.isRead).length;
 });
 
 // ===================== METHODS =====================
 
-// Check if user is blocked
 messageSchema.methods.isUserBlocked = function(userId) {
   return this.blockedBy.some(block => block.userId.toString() === userId.toString());
 };
 
-// Check if user is a participant
 messageSchema.methods.isParticipant = function(userId) {
   return this.participants.some(p => p.userId.toString() === userId.toString());
 };
 
-// Get unread messages count for a specific user
 messageSchema.methods.getUnreadCountForUser = function(userId) {
   return this.messages.filter(msg => 
     msg.senderId.toString() !== userId.toString() && !msg.isRead
   ).length;
 };
 
-// Get last message
 messageSchema.methods.getLastMessage = function() {
   if (this.messages.length === 0) return null;
   return this.messages[this.messages.length - 1];
 };
 
-// Get other participant
 messageSchema.methods.getOtherParticipant = function(userId) {
   return this.participants.find(p => p.userId.toString() !== userId.toString());
 };
 
-// Check if user has blocked the other participant
 messageSchema.methods.hasBlocked = function(userId) {
   const user = this.participants.find(p => p.userId.toString() === userId.toString());
   return user ? user.isBlocked : false;
 };
 
-// Mark all messages as read for a user
 messageSchema.methods.markAllAsRead = function(userId) {
   let count = 0;
   this.messages.forEach(msg => {
@@ -320,7 +317,6 @@ messageSchema.methods.markAllAsRead = function(userId) {
 
 // ===================== PRE-SAVE MIDDLEWARE =====================
 
-// Update timestamps and lastMessage before saving
 messageSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
   this.lastMessageAt = Date.now();
@@ -330,6 +326,7 @@ messageSchema.pre('save', function(next) {
     this.lastMessage = {
       content: lastMsg.content || '',
       senderId: lastMsg.senderId,
+      senderType: lastMsg.senderType,
       senderName: lastMsg.senderName,
       createdAt: lastMsg.createdAt,
       mediaType: lastMsg.media && lastMsg.media.length > 0 ? lastMsg.media[0].type : null,
@@ -343,7 +340,6 @@ messageSchema.pre('save', function(next) {
 
 // ===================== STATIC METHODS =====================
 
-// Find or create a conversation between two users
 messageSchema.statics.findOrCreateConversation = async function(user1Id, user1Type, user1Name, user2Id, user2Type, user2Name) {
   let conversation = await this.findOne({
     participants: {
@@ -376,7 +372,6 @@ messageSchema.statics.findOrCreateConversation = async function(user1Id, user1Ty
   return conversation;
 };
 
-// Get all conversations for a user
 messageSchema.statics.getUserConversations = async function(userId, userType) {
   return this.find({
     'participants': {
@@ -391,7 +386,6 @@ messageSchema.statics.getUserConversations = async function(userId, userType) {
     .populate('messages.senderId', 'name email avatar');
 };
 
-// Get total unread count for a user
 messageSchema.statics.getTotalUnreadCount = async function(userId) {
   const conversations = await this.find({
     'participants': {
