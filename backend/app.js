@@ -26,6 +26,7 @@ const manageOrderRoutes = require('./routes/ManageOrder');
 const profileRoutes = require('./routes/Profile');
 const messageRoutes = require('./routes/Message');
 const reportRoutes = require('./routes/Report');
+const manageUserRoutes = require('./routes/ManageUser');
 
 // Use routes
 app.use('/api/v1/users', userRoutes);
@@ -39,6 +40,8 @@ app.use('/api/v1/manage-orders', manageOrderRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/admin', reportRoutes);
+app.use('/api/v1/admin', manageUserRoutes);
+
 
 
 // ========== HEALTH CHECK ENDPOINT ==========

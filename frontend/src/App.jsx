@@ -35,6 +35,7 @@ import FarmerMessage from "./Components/Farmer/FarmerMessage";
 import ManageReport from "./Components/Admin/ManageReport";
 import Call from "./Components/User/Call";
 import FarmerCall from "./Components/Farmer/FarmerCall";
+import ManageUser from "./Components/Admin/ManageUser";
 
 // Profile wrapper component to determine which profile to show
 const ProfileWrapper = () => {
@@ -109,6 +110,7 @@ const App = () => {
         {/* Admin Protected Routes */}
         <Route path="/admin/dashboard" element={<ProtectedRoute requiredRole="admin"><AdminDashboard /></ProtectedRoute>} />
         <Route path="/admin/manage-report" element={<ProtectedRoute requiredRole="admin"><ManageReport /></ProtectedRoute>} />
+        <Route path="/admin/manage-user" element={<ProtectedRoute requiredRole="admin"><ManageUser /></ProtectedRoute>} />
 
         {/* Single Profile Route */}
         <Route path="/profile/:userId" element={<ProtectedRoute><ProfileWrapper /></ProtectedRoute>} />

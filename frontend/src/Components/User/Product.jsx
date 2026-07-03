@@ -88,6 +88,18 @@ const VideoIcon = ({ size = 16 }) => (
   </svg>
 );
 
+const ChevronLeftIcon = ({ size = 24 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="15 18 9 12 15 6"/>
+  </svg>
+);
+
+const ChevronRightIcon = ({ size = 24 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="9 18 15 12 9 6"/>
+  </svg>
+);
+
 // ── Helper: Check if URL is video ─────────────────────────────────────
 const isVideoUrl = (url) => {
   if (!url) return false;
@@ -111,6 +123,7 @@ const Product = () => {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [viewMode, setViewMode] = useState('grid');
   const [addingToCart, setAddingToCart] = useState(null);
+  const [imageIndexes, setImageIndexes] = useState({});
 
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001';
 
@@ -134,6 +147,12 @@ const Product = () => {
       if (response.ok) {
         const availableProducts = (data.products || []).filter(p => p.isAvailable !== false);
         setProducts(availableProducts);
+        // Initialize image indexes
+        const initialIndexes = {};
+        availableProducts.forEach(p => {
+          initialIndexes[p._id] = 0;
+        });
+        setImageIndexes(initialIndexes);
       } else {
         setError(data.message || 'Failed to fetch products');
       }
@@ -237,7 +256,6 @@ const Product = () => {
       }
       return;
     }
-    // Navigate to checkout with product data
     navigate('/checkout', { 
       state: { 
         product: product,
@@ -298,6 +316,24 @@ const Product = () => {
     return null;
   };
 
+  const navigateImage = (e, productId, direction) => {
+    e.stopPropagation();
+    const product = products.find(p => p._id === productId);
+    if (!product || !product.images || product.images.length === 0) return;
+    
+    setImageIndexes(prev => {
+      const currentIndex = prev[productId] || 0;
+      const total = product.images.length;
+      let newIndex;
+      if (direction === 'next') {
+        newIndex = (currentIndex + 1) % total;
+      } else {
+        newIndex = (currentIndex - 1 + total) % total;
+      }
+      return { ...prev, [productId]: newIndex };
+    });
+  };
+
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           product.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -307,8 +343,8 @@ const Product = () => {
   });
 
   // ── Media Thumbnail Component ──────────────────────────────────────
-  const MediaThumbnail = ({ product }) => {
-    const media = getFirstMedia(product);
+  const MediaThumbnail = ({ product, currentIndex }) => {
+    const media = product.images && product.images.length > 0 ? product.images[currentIndex] : null;
     
     if (!media || !media.url) {
       return <div className="prod-no-image">No Media</div>;
@@ -988,6 +1024,78 @@ const Product = () => {
           animation: prod-spin 0.6s linear infinite;
         }
 
+        /* ── Image Navigation Arrows ── */
+        .prod-image-nav {
+          position: absolute;
+          top: 50%;
+          transform: translateY(-50%);
+          background: rgba(0, 0, 0, 0.6);
+          color: white;
+          border: none;
+          border-radius: 50%;
+          width: 32px;
+          height: 32px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: all 0.2s;
+          z-index: 3;
+          opacity: 0;
+          backdrop-filter: blur(4px);
+        }
+
+        .prod-card:hover .prod-image-nav {
+          opacity: 1;
+        }
+
+        .prod-image-nav:hover {
+          background: rgba(0, 0, 0, 0.8);
+          transform: translateY(-50%) scale(1.1);
+        }
+
+        .prod-image-nav.prev {
+          left: 8px;
+        }
+
+        .prod-image-nav.next {
+          right: 8px;
+        }
+
+        .prod-image-nav svg {
+          width: 18px;
+          height: 18px;
+        }
+
+        /* ── Image Dots ── */
+        .prod-image-dots {
+          position: absolute;
+          bottom: 12px;
+          left: 50%;
+          transform: translateX(-50%);
+          display: flex;
+          gap: 6px;
+          z-index: 3;
+        }
+
+        .prod-image-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: rgba(255, 255, 255, 0.5);
+          transition: all 0.3s;
+          cursor: pointer;
+        }
+
+        .prod-image-dot.active {
+          background: white;
+          transform: scale(1.3);
+        }
+
+        .prod-image-dot:hover {
+          background: rgba(255, 255, 255, 0.8);
+        }
+
         @media (max-width: 768px) {
           .prod-header { flex-direction: column; align-items: stretch; }
           .prod-header-actions { flex-direction: column; }
@@ -998,6 +1106,8 @@ const Product = () => {
           .prod-stats { justify-content: center; }
           .prod-card-actions { flex-wrap: wrap; }
           .prod-action-btn { flex: 1; min-width: 80px; }
+          .prod-image-nav { opacity: 0.7; width: 28px; height: 28px; }
+          .prod-image-nav svg { width: 16px; height: 16px; }
         }
 
         @media (max-width: 480px) {
@@ -1014,6 +1124,8 @@ const Product = () => {
           .prod-card-name { font-size: 0.95rem; }
           .prod-card-price { font-size: 1rem; }
           .prod-card-image { height: 180px; }
+          .prod-image-nav { opacity: 0.7; width: 24px; height: 24px; }
+          .prod-image-nav svg { width: 14px; height: 14px; }
         }
       `}</style>
 
@@ -1113,9 +1225,10 @@ const Product = () => {
                 const farmerName = product.farmer?.name || 'Unknown Farmer';
                 const locationDisplay = getLocationDisplay(product);
                 const unitLabel = getUnitLabel(product.unit);
-                const media = getFirstMedia(product);
-                const isVideo = media ? isVideoUrl(media.url) : false;
                 const mediaCount = product.images?.length || 0;
+                const currentIndex = imageIndexes[product._id] || 0;
+                const currentMedia = product.images && product.images.length > 0 ? product.images[currentIndex] : null;
+                const isVideo = currentMedia ? isVideoUrl(currentMedia.url) : false;
                 const isAdding = addingToCart === product._id;
                 
                 return (
@@ -1124,13 +1237,13 @@ const Product = () => {
                     className={`prod-card ${viewMode === 'list' ? 'list-mode' : ''}`}
                     onClick={() => handleProductClick(product._id)}
                   >
-                    {/* Media */}
+                    {/* Media with Navigation */}
                     <div className="prod-card-image">
-                      {media ? (
+                      {currentMedia ? (
                         isVideo ? (
                           <div className="prod-video-thumbnail">
                             <video
-                              src={media.url.startsWith('http') ? media.url : `${API_BASE_URL}${media.url}`}
+                              src={currentMedia.url.startsWith('http') ? currentMedia.url : `${API_BASE_URL}${currentMedia.url}`}
                               muted
                               playsInline
                               onError={(e) => {
@@ -1147,7 +1260,7 @@ const Product = () => {
                           </div>
                         ) : (
                           <img
-                            src={media.url.startsWith('http') ? media.url : `${API_BASE_URL}${media.url}`}
+                            src={currentMedia.url.startsWith('http') ? currentMedia.url : `${API_BASE_URL}${currentMedia.url}`}
                             alt={product.name}
                             onError={(e) => {
                               e.target.style.display = 'none';
@@ -1158,15 +1271,50 @@ const Product = () => {
                       ) : (
                         <div className="prod-no-image">No Media</div>
                       )}
+                      
                       <span className="category-badge">{product.category}</span>
+                      
+                      {/* Navigation Arrows - only show if multiple images */}
+                      {mediaCount > 1 && (
+                        <>
+                          <button
+                            className="prod-image-nav prev"
+                            onClick={(e) => navigateImage(e, product._id, 'prev')}
+                            aria-label="Previous image"
+                          >
+                            <ChevronLeftIcon size={18} />
+                          </button>
+                          <button
+                            className="prod-image-nav next"
+                            onClick={(e) => navigateImage(e, product._id, 'next')}
+                            aria-label="Next image"
+                          >
+                            <ChevronRightIcon size={18} />
+                          </button>
+                          
+                          {/* Image Dots */}
+                          <div className="prod-image-dots">
+                            {product.images.map((_, idx) => (
+                              <span
+                                key={idx}
+                                className={`prod-image-dot ${idx === currentIndex ? 'active' : ''}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setImageIndexes(prev => ({ ...prev, [product._id]: idx }));
+                                }}
+                              />
+                            ))}
+                          </div>
+                        </>
+                      )}
                       
                       {mediaCount > 1 && (
                         <span className="prod-media-count">
-                          +{mediaCount - 1} more
+                          {currentIndex + 1} / {mediaCount}
                         </span>
                       )}
                       
-                      {media && isVideo && (
+                      {currentMedia && isVideo && (
                         <span className="prod-media-type">
                           <VideoIcon size={12} /> Video
                         </span>
