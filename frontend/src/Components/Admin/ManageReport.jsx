@@ -38,7 +38,8 @@ import {
   Card,
   CardContent,
   Grid,
-  Badge
+  Badge,
+  Divider
 } from '@mui/material';
 import {
   Refresh as RefreshIcon,
@@ -52,7 +53,11 @@ import {
   Comment as CommentIcon,
   PostAdd as PostIcon,
   DoneAll as DoneAllIcon,
-  Warning as WarningIcon
+  Warning as WarningIcon,
+  Person as PersonIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
+  Close as CloseIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 import { format } from 'date-fns';
@@ -75,6 +80,8 @@ const ManageReport = () => {
   const [dialogData, setDialogData] = useState({ status: '', reason: '', adminNote: '' });
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [adminInfo, setAdminInfo] = useState(null);
+  const [viewReportDialog, setViewReportDialog] = useState(false);
+  const [selectedReportForView, setSelectedReportForView] = useState(null);
 
   // Check authentication and admin role
   useEffect(() => {
@@ -250,6 +257,18 @@ const ManageReport = () => {
     setSelectedReport(null);
   };
 
+  // Open view report dialog
+  const openViewReportDialog = (report) => {
+    setSelectedReportForView(report);
+    setViewReportDialog(true);
+  };
+
+  // Close view report dialog
+  const closeViewReportDialog = () => {
+    setViewReportDialog(false);
+    setSelectedReportForView(null);
+  };
+
   // Handle update status
   const handleUpdateStatus = async () => {
     if (!selectedReport) {
@@ -293,7 +312,6 @@ const ManageReport = () => {
       return;
     }
 
-    // Get content type and ID from the report
     const contentType = selectedReport.targetType || selectedReport.type;
     const contentId = selectedReport.targetId || selectedReport.contentId;
     const reportId = selectedReport.reportId || selectedReport._id;
@@ -305,7 +323,6 @@ const ManageReport = () => {
       reason: dialogData.reason
     });
 
-    // Validate we have the required data
     if (!contentType) {
       showSnackbar('Report type is missing', 'error');
       return;
@@ -450,33 +467,49 @@ const ManageReport = () => {
     }
   };
 
-  // Render report item - Updated for new Report model structure
+  // Render avatar
+  const renderAvatar = (user, fallbackIcon = <PersonIcon />) => {
+    if (user?.avatar) {
+      return (
+        <Avatar 
+          src={user.avatar} 
+          alt={user.name || 'User'}
+          sx={{ width: 24, height: 24 }}
+        />
+      );
+    }
+    return (
+      <Avatar sx={{ width: 24, height: 24, bgcolor: '#2E7D32' }}>
+        {user?.name?.charAt(0) || 'U'}
+      </Avatar>
+    );
+  };
+
+  // Render report item
   const renderReportItem = (report) => {
-    // Handle both old and new data structures
     const isHidden = report.isHidden || 
                      (report.contentDetails && report.contentDetails.isHidden) || 
                      false;
     
-    const reportStatus = report.status || report.report?.status || 'Pending';
-    const reportReason = report.reason || report.report?.reason || 'N/A';
-    const reportCreatedAt = report.createdAt || report.report?.createdAt || report.report?.createdAt;
+    const reportStatus = report.status || 'Pending';
+    const reportReason = report.reason || 'N/A';
+    const reportCreatedAt = report.createdAt;
     
-    const contentType = report.targetType || report.type || 'unknown';
-    const contentId = report.targetId || report.contentId;
+    const contentType = report.targetType || 'unknown';
     const reportId = report._id || report.reportId;
 
-    // Get content details
     const contentDetails = report.contentDetails || {};
-    const contentTitle = contentDetails.title || report.title || '';
-    const contentText = contentDetails.content || report.content || '';
-    const authorName = contentDetails.author?.name || 
-                       contentDetails.author || 
-                       report.author?.name || 
-                       report.author || 
-                       'Unknown';
-    const authorType = contentDetails.author?.userType || 
-                       report.author?.userType || 
-                       'User';
+    const reporterDetails = report.reporterDetails || {};
+
+    // Get content title/display text
+    let contentDisplay = '';
+    if (contentType === 'post') {
+      contentDisplay = contentDetails.title || contentDetails.content || 'Post';
+    } else if (contentType === 'comment') {
+      contentDisplay = contentDetails.content || 'Comment';
+    } else if (contentType === 'message') {
+      contentDisplay = contentDetails.content || 'Message';
+    }
 
     return (
       <TableRow key={reportId} hover>
@@ -501,26 +534,31 @@ const ManageReport = () => {
         </TableCell>
         <TableCell>
           <Typography variant="body2" noWrap sx={{ maxWidth: 200 }}>
-            {contentType === 'post' ? contentTitle :
-             contentType === 'comment' ? contentDetails.postTitle || contentText :
-             contentText || 'Message'}
+            {contentDisplay}
           </Typography>
-          {contentType === 'comment' && contentDetails.replyToUserName && (
-            <Typography variant="caption" color="textSecondary" display="block">
-              Replying to: {contentDetails.replyToUserName}
-            </Typography>
-          )}
         </TableCell>
         <TableCell>
           <Stack direction="row" spacing={1} alignItems="center">
-            <Avatar sx={{ width: 24, height: 24, fontSize: 12, bgcolor: '#2E7D32' }}>
-              {authorName?.charAt(0) || 'U'}
-            </Avatar>
+            {renderAvatar(contentDetails.author || contentDetails.sender)}
             <Typography variant="body2">
-              {authorName}
+              {(contentDetails.author?.name || contentDetails.sender?.name || 'Unknown')}
             </Typography>
             <Chip
-              label={authorType}
+              label={contentDetails.author?.userType || contentDetails.sender?.userType || 'User'}
+              size="small"
+              variant="outlined"
+              sx={{ fontSize: '0.6rem', height: 20 }}
+            />
+          </Stack>
+        </TableCell>
+        <TableCell>
+          <Stack direction="row" spacing={1} alignItems="center">
+            {renderAvatar(reporterDetails)}
+            <Typography variant="body2">
+              {reporterDetails.name || 'Unknown'}
+            </Typography>
+            <Chip
+              label={reporterDetails.userType || 'User'}
               size="small"
               variant="outlined"
               sx={{ fontSize: '0.6rem', height: 20 }}
@@ -548,7 +586,16 @@ const ManageReport = () => {
           </Typography>
         </TableCell>
         <TableCell>
-          <Stack direction="row" spacing={1}>
+          <Stack direction="row" spacing={0.5}>
+            <Tooltip title="View Details">
+              <IconButton
+                size="small"
+                color="info"
+                onClick={() => openViewReportDialog(report)}
+              >
+                <VisibilityIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
             <Tooltip title="Update Status">
               <IconButton
                 size="small"
@@ -614,11 +661,9 @@ const ManageReport = () => {
         </TableCell>
         <TableCell>
           <Stack direction="row" spacing={1} alignItems="center">
-            <Avatar sx={{ width: 24, height: 24, fontSize: 12, bgcolor: '#c62828' }}>
-              {item.author?.name?.charAt(0) || item.author?.charAt(0) || 'U'}
-            </Avatar>
+            {renderAvatar(item.author || item.sender)}
             <Typography variant="body2">
-              {item.author?.name || item.author || 'Unknown'}
+              {(item.author?.name || item.sender?.name || 'Unknown')}
             </Typography>
           </Stack>
         </TableCell>
@@ -633,13 +678,30 @@ const ManageReport = () => {
           </Typography>
         </TableCell>
         <TableCell>
+          <Tooltip title="View Details">
+            <IconButton
+              size="small"
+              color="info"
+              onClick={() => {
+                setSelectedReportForView({
+                  ...item,
+                  targetType: item.type,
+                  contentDetails: item,
+                  reporterDetails: item.hiddenBy
+                });
+                setViewReportDialog(true);
+              }}
+            >
+              <VisibilityIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
           <Tooltip title="Unhide Content">
             <IconButton
               size="small"
               color="success"
               onClick={() => handleUnhideContent(item)}
             >
-              <VisibilityIcon fontSize="small" />
+              <VisibilityOffIcon fontSize="small" />
             </IconButton>
           </Tooltip>
         </TableCell>
@@ -793,6 +855,7 @@ const ManageReport = () => {
                   <TableRow>
                     <TableCell>Type</TableCell>
                     <TableCell>Content</TableCell>
+                    <TableCell>Content Author</TableCell>
                     <TableCell>Reported By</TableCell>
                     <TableCell>Reason</TableCell>
                     <TableCell>Status</TableCell>
@@ -803,7 +866,7 @@ const ManageReport = () => {
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={7} align="center">
+                      <TableCell colSpan={8} align="center">
                         <CircularProgress />
                       </TableCell>
                     </TableRow>
@@ -812,7 +875,7 @@ const ManageReport = () => {
                       reports.map(renderReportItem)
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={7} align="center">
+                        <TableCell colSpan={8} align="center">
                           <Typography variant="body2" color="textSecondary">
                             No reports found
                           </Typography>
@@ -848,6 +911,177 @@ const ManageReport = () => {
           </Paper>
         </Container>
       </div>
+
+      {/* View Report Dialog */}
+      <Dialog open={viewReportDialog} onClose={closeViewReportDialog} maxWidth="md" fullWidth>
+        <DialogTitle>
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6">Report Details</Typography>
+            <IconButton onClick={closeViewReportDialog}>
+              <CloseIcon />
+            </IconButton>
+          </Stack>
+        </DialogTitle>
+        <DialogContent dividers>
+          {selectedReportForView && (
+            <Stack spacing={2}>
+              {/* Report Info */}
+              <Paper variant="outlined" sx={{ p: 2 }}>
+                <Typography variant="subtitle2" color="textSecondary" gutterBottom>Report Information</Typography>
+                <Grid container spacing={1}>
+                  <Grid item xs={6}>
+                    <Typography variant="caption" color="textSecondary">Type</Typography>
+                    <Typography variant="body2">
+                      {selectedReportForView.targetType || selectedReportForView.type || 'Unknown'}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Typography variant="caption" color="textSecondary">Status</Typography>
+                    <Chip
+                      label={selectedReportForView.status || 'Pending'}
+                      size="small"
+                      color={getStatusChipColor(selectedReportForView.status || 'Pending')}
+                    />
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Typography variant="caption" color="textSecondary">Reason</Typography>
+                    <Typography variant="body2">{selectedReportForView.reason || 'N/A'}</Typography>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Typography variant="caption" color="textSecondary">Reported At</Typography>
+                    <Typography variant="body2">{formatDate(selectedReportForView.createdAt)}</Typography>
+                  </Grid>
+                </Grid>
+              </Paper>
+
+              {/* Reporter Info */}
+              <Paper variant="outlined" sx={{ p: 2 }}>
+                <Typography variant="subtitle2" color="textSecondary" gutterBottom>Reported By</Typography>
+                <Stack direction="row" spacing={2} alignItems="center">
+                  {renderAvatar(selectedReportForView.reporterDetails)}
+                  <Box>
+                    <Typography variant="body2">
+                      {selectedReportForView.reporterDetails?.name || 'Unknown'}
+                    </Typography>
+                    <Typography variant="caption" color="textSecondary">
+                      {selectedReportForView.reporterDetails?.userType || 'User'}
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Paper>
+
+              {/* Content Info */}
+              <Paper variant="outlined" sx={{ p: 2 }}>
+                <Typography variant="subtitle2" color="textSecondary" gutterBottom>Content Details</Typography>
+                <Stack spacing={1}>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    {getTypeIcon(selectedReportForView.targetType || selectedReportForView.type)}
+                    <Typography variant="body2" fontWeight="bold">
+                      {(selectedReportForView.targetType || selectedReportForView.type || 'Unknown').charAt(0).toUpperCase() + 
+                       (selectedReportForView.targetType || selectedReportForView.type || 'unknown').slice(1)}
+                    </Typography>
+                    {selectedReportForView.isHidden && (
+                      <Chip label="Hidden" size="small" color="error" />
+                    )}
+                  </Stack>
+                  
+                  {/* Content Author */}
+                  {selectedReportForView.contentDetails?.author && (
+                    <Stack direction="row" spacing={2} alignItems="center">
+                      <Typography variant="caption" color="textSecondary">Author:</Typography>
+                      {renderAvatar(selectedReportForView.contentDetails.author)}
+                      <Typography variant="body2">
+                        {selectedReportForView.contentDetails.author.name || 'Unknown'}
+                      </Typography>
+                      <Chip
+                        label={selectedReportForView.contentDetails.author.userType || 'User'}
+                        size="small"
+                        variant="outlined"
+                        sx={{ fontSize: '0.6rem', height: 20 }}
+                      />
+                    </Stack>
+                  )}
+                  
+                  {/* Message Sender */}
+                  {selectedReportForView.contentDetails?.sender && (
+                    <Stack direction="row" spacing={2} alignItems="center">
+                      <Typography variant="caption" color="textSecondary">Sender:</Typography>
+                      {renderAvatar(selectedReportForView.contentDetails.sender)}
+                      <Typography variant="body2">
+                        {selectedReportForView.contentDetails.sender.name || 'Unknown'}
+                      </Typography>
+                      <Chip
+                        label={selectedReportForView.contentDetails.sender.userType || 'User'}
+                        size="small"
+                        variant="outlined"
+                        sx={{ fontSize: '0.6rem', height: 20 }}
+                      />
+                    </Stack>
+                  )}
+                  
+                  {/* Content */}
+                  <Box>
+                    <Typography variant="caption" color="textSecondary">Content:</Typography>
+                    <Paper variant="outlined" sx={{ p: 1, mt: 0.5, bgcolor: '#f5f5f5' }}>
+                      <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                        {selectedReportForView.contentDetails?.fullContent || 
+                         selectedReportForView.contentDetails?.content || 
+                         selectedReportForView.content || 
+                         'No content available'}
+                      </Typography>
+                    </Paper>
+                  </Box>
+
+                  {/* Post Title */}
+                  {selectedReportForView.contentDetails?.title && (
+                    <Box>
+                      <Typography variant="caption" color="textSecondary">Title:</Typography>
+                      <Typography variant="body2">
+                        {selectedReportForView.contentDetails.title}
+                      </Typography>
+                    </Box>
+                  )}
+
+                  {/* Post Title for comment */}
+                  {selectedReportForView.contentDetails?.postTitle && (
+                    <Box>
+                      <Typography variant="caption" color="textSecondary">Post:</Typography>
+                      <Typography variant="body2">
+                        {selectedReportForView.contentDetails.postTitle}
+                      </Typography>
+                    </Box>
+                  )}
+
+                  {/* Admin Note */}
+                  {selectedReportForView.adminNote && (
+                    <Box>
+                      <Typography variant="caption" color="textSecondary">Admin Note:</Typography>
+                      <Typography variant="body2" color="primary">
+                        {selectedReportForView.adminNote}
+                      </Typography>
+                    </Box>
+                  )}
+
+                  {/* Hide Reason */}
+                  {selectedReportForView.hideReason && (
+                    <Box>
+                      <Typography variant="caption" color="textSecondary">Hide Reason:</Typography>
+                      <Typography variant="body2" color="error">
+                        {selectedReportForView.hideReason}
+                      </Typography>
+                    </Box>
+                  )}
+                </Stack>
+              </Paper>
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeViewReportDialog} variant="contained">
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Dialogs */}
       <Dialog open={dialogOpen} onClose={closeDialog} maxWidth="sm" fullWidth>
@@ -891,16 +1125,10 @@ const ManageReport = () => {
               </Typography>
               <Typography variant="caption" color="textSecondary" display="block">
                 <strong>Content:</strong> {
-                  selectedReport?.targetType === 'post' ? selectedReport?.contentDetails?.title || selectedReport?.title :
+                  selectedReport?.targetType === 'post' ? selectedReport?.contentDetails?.title || selectedReport?.contentDetails?.content || selectedReport?.title :
                   selectedReport?.targetType === 'comment' ? selectedReport?.contentDetails?.content || selectedReport?.content :
                   selectedReport?.contentDetails?.content || selectedReport?.content || 'Message'
                 }
-              </Typography>
-              <Typography variant="caption" color="textSecondary" display="block">
-                <strong>Content ID:</strong> {selectedReport?.targetId || selectedReport?.contentId}
-              </Typography>
-              <Typography variant="caption" color="textSecondary" display="block">
-                <strong>Type:</strong> {selectedReport?.targetType || selectedReport?.type}
               </Typography>
               <TextField
                 label="Reason for hiding"

@@ -1039,7 +1039,7 @@ const UserMessage = () => {
     }
   };
 
-  // ===== FIXED REPORT MESSAGE FUNCTION =====
+  // ===== REPORT MESSAGE FUNCTION (Updated to use /api/admin) =====
   const reportMessage = async () => {
     console.log('📝 reportMessage called');
     console.log('reportReason:', reportReason);
@@ -1065,14 +1065,22 @@ const UserMessage = () => {
     }
 
     try {
-      console.log('📤 Sending report request...');
+      console.log('📤 Sending report request to:', `${API_BASE_URL}/api/admin/messages/${selectedMessage._id}/report`);
+      
+      // Use the correct endpoint - mounted at /api/admin
       const response = await axios.post(
-        `${API_BASE_URL}/api/messages/conversations/${selectedConversation._id}/messages/${selectedMessage._id}/report`,
+        `${API_BASE_URL}/api/admin/messages/${selectedMessage._id}/report`,
         { 
+          conversationId: selectedConversation._id,
           reason: reportReason, 
           description: reportDescription || '' 
         },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { 
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          } 
+        }
       );
 
       console.log('✅ Report response:', response.data);
@@ -1095,13 +1103,15 @@ const UserMessage = () => {
         toast.error(error.response.data.message);
       } else if (error.response?.data?.error) {
         toast.error(error.response.data.error);
+      } else if (error.response?.status === 400 && error.response?.data?.message === 'You have already reported this content') {
+        toast.error('You have already reported this message');
       } else {
         toast.error('Failed to report message. Please try again.');
       }
     }
   };
 
-  // ===== FIXED HANDLE KEY PRESS =====
+  // ===== HANDLE KEY PRESS =====
   const handleKeyPress = (e) => {
     // If report modal is open, don't send message on Enter
     if (showReportModal) {
@@ -1658,7 +1668,7 @@ const UserMessage = () => {
         </div>
       )}
 
-      {/* ===== FIXED REPORT MODAL ===== */}
+      {/* Report Modal - Updated with correct endpoint */}
       {showReportModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => {
           console.log('❌ Closing report modal (clicked outside)');

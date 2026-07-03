@@ -35,6 +35,39 @@ router.get(
   reportController.getMyReports
 );
 
+// ===================== MESSAGE REPORT ROUTES =====================
+
+// Report a message
+router.post(
+  '/messages/:messageId/report',
+  isAuthenticatedUser,
+  reportController.reportMessage
+);
+
+// Get reports for a specific message (Admin)
+router.get(
+  '/messages/:messageId/reports',
+  isAuthenticatedUser,
+  isAdmin,
+  reportController.getMessageReports
+);
+
+// Get all message reports (Admin)
+router.get(
+  '/messages/reports/all',
+  isAuthenticatedUser,
+  isAdmin,
+  reportController.getAllMessageReports
+);
+
+// Update message report status (Admin)
+router.put(
+  '/messages/reports/:reportId/status',
+  isAuthenticatedUser,
+  isAdmin,
+  reportController.updateMessageReportStatus
+);
+
 // ===================== ADMIN REPORT MANAGEMENT ROUTES =====================
 // All routes below require authentication and admin privileges
 
