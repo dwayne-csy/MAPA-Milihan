@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom'; // Add this import
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Header from '../layouts/Header';
 
@@ -57,7 +57,7 @@ const compareUserId = (id1, id2) => {
 };
 
 const UserForum = () => {
-  const navigate = useNavigate(); // Add useNavigate hook
+  const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [userId, setUserId] = useState(null);
   const [posts, setPosts] = useState([]);
@@ -100,6 +100,7 @@ const UserForum = () => {
   });
   const [userAvatars, setUserAvatars] = useState({});
   const [expandedComments, setExpandedComments] = useState({});
+  const [reporting, setReporting] = useState(false);
   
   const fileInputRef = useRef(null);
   const commentFileInputRef = useRef(null);
@@ -169,14 +170,24 @@ const UserForum = () => {
       const token = localStorage.getItem('token');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const response = await axios.get(`${API_BASE_URL}/api/forums/posts?page=${pageNum}&limit=10`, { headers });
-      const postsData = response.data.data;
+      let postsData = response.data.data;
       
-      console.log('📊 Posts data:', postsData.map(p => ({
+      // 🔥 FILTER OUT HIDDEN POSTS
+      postsData = postsData.filter(post => !post.isHidden);
+      
+      // Also filter out hidden comments from each post
+      postsData = postsData.map(post => {
+        if (post.comments && post.comments.length > 0) {
+          post.comments = post.comments.filter(comment => !comment.isHidden);
+        }
+        return post;
+      });
+      
+      console.log('📊 Posts data (hidden filtered):', postsData.map(p => ({
         id: p._id,
         title: p.title,
-        author: p.author,
-        userType: p.author?.userType,
-        authorUserId: p.author?.userId
+        isHidden: p.isHidden,
+        commentsCount: p.comments?.length || 0
       })));
       
       setPosts(postsData);
@@ -514,7 +525,12 @@ const UserForum = () => {
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const response = await axios.get(`${API_BASE_URL}/api/forums/posts/${postId}`, { headers });
       
-      const updatedPost = response.data.data;
+      let updatedPost = response.data.data;
+      
+      // 🔥 FILTER OUT HIDDEN COMMENTS
+      if (updatedPost.comments && updatedPost.comments.length > 0) {
+        updatedPost.comments = updatedPost.comments.filter(comment => !comment.isHidden);
+      }
       
       await fetchAvatarsForPosts([updatedPost]);
       
@@ -895,7 +911,7 @@ const UserForum = () => {
     });
   };
 
-  // Submit report
+  // Submit report - Updated to use centralized report endpoint
   const handleSubmitReport = async () => {
     if (!reportData.reason) {
       alert('Please select a reason for reporting');
@@ -903,20 +919,46 @@ const UserForum = () => {
     }
 
     try {
+      setReporting(true);
       const token = localStorage.getItem('token');
-      await axios.post(`${API_BASE_URL}/api/forums/posts/${reportData.targetId}/report`, 
-        { 
+      
+      const response = await axios.post(
+        `${API_BASE_URL}/api/admin/report`,
+        {
+          targetType: reportData.reportType,
+          targetId: reportData.targetId,
           reason: reportData.reason,
-          description: reportData.description 
+          description: reportData.description || ''
         },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { 
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          } 
+        }
       );
       
-      alert('Report submitted successfully');
-      closeReportModal();
+      if (response.data.success) {
+        alert('Report submitted successfully');
+        closeReportModal();
+        // Refresh the post to reflect any changes
+        if (selectedPost) {
+          fetchPostById(selectedPost._id);
+        }
+      } else {
+        alert(response.data.message || 'Failed to submit report');
+      }
     } catch (err) {
       console.error('Failed to submit report:', err);
-      alert('Failed to submit report');
+      if (err.response?.data?.message) {
+        alert(err.response.data.message);
+      } else if (err.response?.status === 400 && err.response?.data?.message === 'You have already reported this content') {
+        alert('You have already reported this content');
+      } else {
+        alert('Failed to submit report. Please try again.');
+      }
+    } finally {
+      setReporting(false);
     }
   };
 
@@ -2001,8 +2043,8 @@ const UserForum = () => {
                 <button type="button" onClick={closeReportModal} className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg font-medium transition-colors">
                   Cancel
                 </button>
-                <button type="submit" className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors">
-                  Submit Report
+                <button type="submit" className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors" disabled={reporting}>
+                  {reporting ? 'Submitting...' : 'Submit Report'}
                 </button>
               </div>
             </form>

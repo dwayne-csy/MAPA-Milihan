@@ -169,7 +169,13 @@ const FarmerMessage = () => {
       const response = await axios.get(`${API_BASE_URL}/api/messages/conversations/${conversationId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setMessages(response.data.data.messages || []);
+      
+      let messagesData = response.data.data.messages || [];
+      
+      // 🔥 FILTER OUT HIDDEN MESSAGES
+      messagesData = messagesData.filter(msg => !msg.isHidden);
+      
+      setMessages(messagesData);
       
       if (response.data.data.markedAsRead > 0) {
         setUnreadCounts(prev => ({
@@ -184,7 +190,6 @@ const FarmerMessage = () => {
       console.error('Error fetching messages:', error);
     }
   }, [API_BASE_URL, token]);
-
   // Fetch conversations
   const fetchConversations = useCallback(async () => {
     try {
@@ -323,20 +328,23 @@ const FarmerMessage = () => {
   }, [API_BASE_URL, token]);
 
   // Handle WebSocket messages
-  const handleWebSocketMessage = (data) => {
-    switch (data.type) {
-      case 'new_message':
-        if (selectedConversation && data.conversationId === selectedConversation._id) {
-          setMessages(prev => [...prev, data.message]);
-          markAsRead(data.conversationId);
-        } else {
-          setUnreadCounts(prev => ({
-            ...prev,
-            [data.conversationId]: (prev[data.conversationId] || 0) + 1
-          }));
-          fetchConversations();
-        }
-        break;
+    const handleWebSocketMessage = (data) => {
+      switch (data.type) {
+        case 'new_message':
+          // 🔥 Only add message if it's not hidden
+          if (selectedConversation && data.conversationId === selectedConversation._id) {
+            if (!data.message.isHidden) {
+              setMessages(prev => [...prev, data.message]);
+            }
+            markAsRead(data.conversationId);
+          } else {
+            setUnreadCounts(prev => ({
+              ...prev,
+              [data.conversationId]: (prev[data.conversationId] || 0) + 1
+            }));
+            fetchConversations();
+          }
+          break;
       case 'read_receipt':
         if (selectedConversation && data.conversationId === selectedConversation._id) {
           setMessages(prev => prev.map(msg => 
@@ -857,89 +865,91 @@ const FarmerMessage = () => {
   };
 
   // Send message
-  const sendMessage = async () => {
-    if (!newMessage.trim() && mediaFiles.length === 0) return;
-    
-    if (!selectedConversation) {
-      if (userId) {
-        if (currentUserId && userId === currentUserId) {
-          toast.warning("You cannot send messages to yourself");
-          return;
-        }
-        toast.info('Creating conversation...');
-        await createConversationWithUser(userId);
-        setTimeout(() => {
-          if (selectedConversation) sendMessage();
-          else toast.error('Could not create conversation');
-        }, 1500);
-      } else {
-        toast.error('No conversation selected');
-      }
-      return;
-    }
-
-    setSending(true);
-    const formData = new FormData();
-    const otherParticipant = selectedConversation.otherParticipant;
-    
-    if (!otherParticipant) {
-      toast.error('Recipient not found');
-      setSending(false);
-      return;
-    }
-    
-    let receiverId = otherParticipant.userId?._id || otherParticipant.userId || otherParticipant._id;
-    if (!receiverId) {
-      toast.error('Recipient ID not found');
-      setSending(false);
-      return;
-    }
-    
-    let receiverType = otherParticipant.userType || 'User';
-    const validTypes = ['User', 'Farmer', 'Admin'];
-    if (!validTypes.includes(receiverType)) receiverType = 'User';
-    const receiverName = otherParticipant.name || otherParticipant.userId?.name || 'User';
-    
-    formData.append('receiverId', receiverId);
-    formData.append('receiverType', receiverType);
-    formData.append('receiverName', receiverName);
-    formData.append('content', newMessage);
-    if (replyingTo) formData.append('replyToMessageId', replyingTo._id);
-    mediaFiles.forEach(file => formData.append('media', file));
-
-    try {
-      const response = await axios.post(
-        `${API_BASE_URL}/api/messages/send`,
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-            Authorization: `Bearer ${token}`
+    const sendMessage = async () => {
+      if (!newMessage.trim() && mediaFiles.length === 0) return;
+      
+      if (!selectedConversation) {
+        if (userId) {
+          if (currentUserId && userId === currentUserId) {
+            toast.warning("You cannot send messages to yourself");
+            return;
           }
+          toast.info('Creating conversation...');
+          await createConversationWithUser(userId);
+          setTimeout(() => {
+            if (selectedConversation) sendMessage();
+            else toast.error('Could not create conversation');
+          }, 1500);
+        } else {
+          toast.error('No conversation selected');
         }
-      );
-
-      setNewMessage('');
-      setMediaFiles([]);
-      setReplyingTo(null);
-      const sentMessage = response.data.data.messages[response.data.data.messages.length - 1];
-      setMessages(prev => [...prev, sentMessage]);
-      fetchConversations();
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({
-          type: 'typing',
-          conversationId: selectedConversation._id,
-          isTyping: false
-        }));
+        return;
       }
-    } catch (error) {
-      console.error('Error sending message:', error);
-      toast.error('Failed to send message');
-    } finally {
-      setSending(false);
-    }
-  };
 
+      setSending(true);
+      const formData = new FormData();
+      const otherParticipant = selectedConversation.otherParticipant;
+      
+      if (!otherParticipant) {
+        toast.error('Recipient not found');
+        setSending(false);
+        return;
+      }
+      
+      let receiverId = otherParticipant.userId?._id || otherParticipant.userId || otherParticipant._id;
+      if (!receiverId) {
+        toast.error('Recipient ID not found');
+        setSending(false);
+        return;
+      }
+      
+      let receiverType = otherParticipant.userType || 'User';
+      const validTypes = ['User', 'Farmer', 'Admin'];
+      if (!validTypes.includes(receiverType)) receiverType = 'User';
+      const receiverName = otherParticipant.name || otherParticipant.userId?.name || 'User';
+      
+      formData.append('receiverId', receiverId);
+      formData.append('receiverType', receiverType);
+      formData.append('receiverName', receiverName);
+      formData.append('content', newMessage);
+      if (replyingTo) formData.append('replyToMessageId', replyingTo._id);
+      mediaFiles.forEach(file => formData.append('media', file));
+
+      try {
+        const response = await axios.post(
+          `${API_BASE_URL}/api/messages/send`,
+          formData,
+          {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+              Authorization: `Bearer ${token}`
+            }
+          }
+        );
+
+        setNewMessage('');
+        setMediaFiles([]);
+        setReplyingTo(null);
+        const sentMessage = response.data.data.messages[response.data.data.messages.length - 1];
+        // 🔥 Only add if not hidden
+        if (!sentMessage.isHidden) {
+          setMessages(prev => [...prev, sentMessage]);
+        }
+        fetchConversations();
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: 'typing',
+            conversationId: selectedConversation._id,
+            isTyping: false
+          }));
+        }
+      } catch (error) {
+        console.error('Error sending message:', error);
+        toast.error('Failed to send message');
+      } finally {
+        setSending(false);
+      }
+    };
   // Handle file selection
   const handleFileSelect = (e) => {
     const files = Array.from(e.target.files);

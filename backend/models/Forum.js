@@ -128,11 +128,138 @@ const forumPostSchema = new mongoose.Schema({
       type: String,
       default: null
     },
+    // Report Management Fields
+    isHidden: {
+      type: Boolean,
+      default: false
+    },
+    hiddenAt: {
+      type: Date,
+      default: null
+    },
+    hiddenBy: {
+      userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+      },
+      userType: {
+        type: String,
+        enum: ['User', 'Farmer', 'Admin']
+      }
+    },
+    hideReason: {
+      type: String,
+      default: null
+    },
+    unhiddenAt: {
+      type: Date,
+      default: null
+    },
+    unhiddenBy: {
+      userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+      },
+      userType: {
+        type: String,
+        enum: ['User', 'Farmer', 'Admin']
+      }
+    },
+    // Report tracking
+    reports: [{
+      reportedBy: {
+        userId: {
+          type: mongoose.Schema.Types.ObjectId,
+          required: true,
+          refPath: 'comments.reports.reportedBy.userType'
+        },
+        userType: {
+          type: String,
+          required: true,
+          enum: ['User', 'Farmer', 'Admin']
+        }
+      },
+      reason: {
+        type: String,
+        required: true,
+        enum: ['Spam', 'Harassment', 'Inappropriate Content', 'False Information', 'Other']
+      },
+      description: {
+        type: String,
+        trim: true,
+        maxlength: 500
+      },
+      status: {
+        type: String,
+        enum: ['Pending', 'Reviewed', 'Resolved', 'Dismissed'],
+        default: 'Pending'
+      },
+      adminNote: {
+        type: String,
+        trim: true,
+        maxlength: 500
+      },
+      reviewedAt: {
+        type: Date
+      },
+      reviewedBy: {
+        userId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User'
+        },
+        userType: {
+          type: String,
+          enum: ['User', 'Farmer', 'Admin']
+        }
+      },
+      createdAt: {
+        type: Date,
+        default: Date.now
+      }
+    }],
     createdAt: {
       type: Date,
       default: Date.now
     }
   }],
+  // Report Management Fields for Post
+  isHidden: {
+    type: Boolean,
+    default: false
+  },
+  hiddenAt: {
+    type: Date,
+    default: null
+  },
+  hiddenBy: {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    userType: {
+      type: String,
+      enum: ['User', 'Farmer', 'Admin']
+    }
+  },
+  hideReason: {
+    type: String,
+    default: null
+  },
+  unhiddenAt: {
+    type: Date,
+    default: null
+  },
+  unhiddenBy: {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    userType: {
+      type: String,
+      enum: ['User', 'Farmer', 'Admin']
+    }
+  },
+  // Post Reports
   reports: [{
     reportedBy: {
       userId: {
@@ -161,6 +288,24 @@ const forumPostSchema = new mongoose.Schema({
       enum: ['Pending', 'Reviewed', 'Resolved', 'Dismissed'],
       default: 'Pending'
     },
+    adminNote: {
+      type: String,
+      trim: true,
+      maxlength: 500
+    },
+    reviewedAt: {
+      type: Date
+    },
+    reviewedBy: {
+      userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+      },
+      userType: {
+        type: String,
+        enum: ['User', 'Farmer', 'Admin']
+      }
+    },
     createdAt: {
       type: Date,
       default: Date.now
@@ -183,6 +328,26 @@ forumPostSchema.index({ category: 1 });
 forumPostSchema.index({ 'reports.status': 1 });
 forumPostSchema.index({ title: 'text', content: 'text' });
 forumPostSchema.index({ 'comments.parentCommentId': 1 });
+forumPostSchema.index({ isHidden: 1 });
+forumPostSchema.index({ 'comments.isHidden': 1 });
+forumPostSchema.index({ 'reports._id': 1 });
+forumPostSchema.index({ 'comments.reports._id': 1 });
+
+// Virtual for getting visible posts (not hidden)
+forumPostSchema.statics.getVisiblePosts = function(filter = {}) {
+  return this.find({ ...filter, isHidden: { $ne: true } });
+};
+
+// Virtual for getting visible comments
+forumPostSchema.methods.getVisibleComments = function() {
+  return this.comments.filter(comment => !comment.isHidden);
+};
+
+// Pre-save middleware
+forumPostSchema.pre('save', function(next) {
+  this.updatedAt = Date.now();
+  next();
+});
 
 const ForumPost = mongoose.model('ForumPost', forumPostSchema);
 

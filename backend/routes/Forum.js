@@ -70,12 +70,4 @@ router.post('/posts/:id/like', isAuthenticatedUser, forumController.toggleLikePo
 // Toggle like on comment
 router.post('/posts/:id/comments/:commentId/like', isAuthenticatedUser, forumController.toggleLikeComment);
 
-// ===================== REPORT ROUTES =====================
-
-// Report post
-router.post('/posts/:id/report', isAuthenticatedUser, forumController.reportPost);
-
-// Report comment
-router.post('/posts/:id/comments/:commentId/report', isAuthenticatedUser, forumController.reportComment);
-
 module.exports = router;

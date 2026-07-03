@@ -32,6 +32,7 @@ import UProfile from "./Components/User/UProfile";
 import FProfile from "./Components/Farmer/FProfile";
 import UserMessage from "./Components/User/Message";
 import FarmerMessage from "./Components/Farmer/FarmerMessage";
+import ManageReport from "./Components/Admin/ManageReport";
 import Call from "./Components/User/Call";
 import FarmerCall from "./Components/Farmer/FarmerCall";
 
@@ -107,6 +108,7 @@ const App = () => {
 
         {/* Admin Protected Routes */}
         <Route path="/admin/dashboard" element={<ProtectedRoute requiredRole="admin"><AdminDashboard /></ProtectedRoute>} />
+        <Route path="/admin/manage-report" element={<ProtectedRoute requiredRole="admin"><ManageReport /></ProtectedRoute>} />
 
         {/* Single Profile Route */}
         <Route path="/profile/:userId" element={<ProtectedRoute><ProfileWrapper /></ProtectedRoute>} />

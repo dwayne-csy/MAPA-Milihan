@@ -52,6 +52,7 @@ const FProfile = () => {
   const [posts, setPosts] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
+  const [isFollowLoading, setIsFollowLoading] = useState(false);
 
   // Modal states
   const [showModal, setShowModal] = useState(false);
@@ -106,25 +107,41 @@ const FProfile = () => {
     }
   };
 
+  // Handle follow/unfollow toggle - FIXED: Using '/follow' endpoint
   const handleFollowToggle = async () => {
+    if (isFollowLoading) return; // Prevent multiple clicks
+    
+    setIsFollowLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const endpoint = isFollowing ? 'unfollow' : 'follow';
+      // Use the same endpoint '/follow' for both follow and unfollow
+      // but with different HTTP methods (POST for follow, DELETE for unfollow)
+      const method = isFollowing ? 'delete' : 'post';
       
       const response = await axios({
-        method: isFollowing ? 'delete' : 'post',
-        url: `${API_BASE_URL}/api/profile/${userId}/${endpoint}`,
+        method: method,
+        url: `${API_BASE_URL}/api/profile/${userId}/follow`, // Changed from '/unfollow' to '/follow'
         headers: { Authorization: `Bearer ${token}` }
       });
 
       if (response.data.success) {
+        // Toggle the follow state
         setIsFollowing(!isFollowing);
+        
+        // Update the followers count
         setFollowersCount(prev => isFollowing ? prev - 1 : prev + 1);
+        
+        // Show success message
         toast.success(isFollowing ? 'Unfollowed successfully' : 'Followed successfully');
+        
+        // Refresh the profile data to ensure consistency
+        await fetchProfile();
       }
     } catch (error) {
       console.error('Error toggling follow:', error);
       toast.error(error.response?.data?.message || 'Failed to update follow status');
+    } finally {
+      setIsFollowLoading(false);
     }
   };
 
@@ -431,7 +448,7 @@ const FProfile = () => {
                 <FaCalendarAlt /> Joined {formatDate(user.createdAt)}
               </div>
 
-              {/* Action Buttons */}
+              {/* Action Buttons - UPDATED: Following button now has unfollow functionality */}
               <div className="flex flex-wrap gap-3">
                 {isOwnProfile ? (
                   <button 
@@ -443,15 +460,25 @@ const FProfile = () => {
                 ) : (
                   <>
                     <button 
-                      className={`px-6 py-3 rounded-md transition-colors flex items-center gap-2 text-sm font-medium ${
+                      className={`px-6 py-3 rounded-md transition-colors flex items-center gap-2 text-sm font-medium min-w-[120px] justify-center ${
                         isFollowing 
-                          ? 'bg-gray-600 hover:bg-gray-700 text-white' 
+                          ? 'bg-gray-200 hover:bg-gray-300 text-gray-700 border border-gray-300' 
                           : 'bg-blue-500 hover:bg-blue-600 text-white'
                       }`}
                       onClick={handleFollowToggle}
+                      disabled={isFollowLoading}
                     >
-                      {isFollowing ? <FaUserMinus /> : <FaUserPlus />}
-                      {isFollowing ? ' Following' : ' Follow'}
+                      {isFollowLoading ? (
+                        <FaSpinner className="animate-spin" />
+                      ) : isFollowing ? (
+                        <>
+                          <FaUserMinus /> Following
+                        </>
+                      ) : (
+                        <>
+                          <FaUserPlus /> Follow
+                        </>
+                      )}
                     </button>
                     <button 
                       className="px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-md transition-colors flex items-center gap-2 text-sm font-medium"

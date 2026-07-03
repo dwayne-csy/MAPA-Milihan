@@ -157,6 +157,44 @@ const messageSchema = new mongoose.Schema({
         default: Date.now
       }
     }],
+    // Report Management Fields for Message
+    isHidden: {
+      type: Boolean,
+      default: false
+    },
+    hiddenAt: {
+      type: Date,
+      default: null
+    },
+    hiddenBy: {
+      userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+      },
+      userType: {
+        type: String,
+        enum: ['User', 'Farmer', 'Admin']
+      }
+    },
+    hideReason: {
+      type: String,
+      default: null
+    },
+    unhiddenAt: {
+      type: Date,
+      default: null
+    },
+    unhiddenBy: {
+      userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+      },
+      userType: {
+        type: String,
+        enum: ['User', 'Farmer', 'Admin']
+      }
+    },
+    // Message Reports
     reports: [{
       reportedBy: {
         userId: {
@@ -184,6 +222,24 @@ const messageSchema = new mongoose.Schema({
         type: String,
         enum: ['Pending', 'Reviewed', 'Resolved', 'Dismissed'],
         default: 'Pending'
+      },
+      adminNote: {
+        type: String,
+        trim: true,
+        maxlength: 500
+      },
+      reviewedAt: {
+        type: Date
+      },
+      reviewedBy: {
+        userId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User'
+        },
+        userType: {
+          type: String,
+          enum: ['User', 'Farmer', 'Admin']
+        }
       },
       createdAt: {
         type: Date,
@@ -266,6 +322,8 @@ messageSchema.index({ 'messages.reports.status': 1 });
 messageSchema.index({ 'messages.createdAt': -1 });
 messageSchema.index({ 'participants.isBlocked': 1 });
 messageSchema.index({ 'blockedBy.userId': 1 });
+messageSchema.index({ 'messages.isHidden': 1 });
+messageSchema.index({ 'messages.reports._id': 1 });
 
 // ===================== VIRTUALS =====================
 
@@ -315,28 +373,25 @@ messageSchema.methods.markAllAsRead = function(userId) {
   return count;
 };
 
-// ===================== PRE-SAVE MIDDLEWARE =====================
+// Get visible messages (not hidden)
+messageSchema.methods.getVisibleMessages = function() {
+  return this.messages.filter(msg => !msg.isHidden);
+};
 
-messageSchema.pre('save', function(next) {
-  this.updatedAt = Date.now();
-  this.lastMessageAt = Date.now();
-  
-  if (this.messages.length > 0) {
-    const lastMsg = this.messages[this.messages.length - 1];
-    this.lastMessage = {
-      content: lastMsg.content || '',
-      senderId: lastMsg.senderId,
-      senderType: lastMsg.senderType,
-      senderName: lastMsg.senderName,
-      createdAt: lastMsg.createdAt,
-      mediaType: lastMsg.media && lastMsg.media.length > 0 ? lastMsg.media[0].type : null,
-      callType: lastMsg.callType !== 'none' ? lastMsg.callType : null,
-      callStatus: lastMsg.callStatus !== 'none' ? lastMsg.callStatus : null
-    };
-  }
-  
-  next();
-});
+// Get messages for a specific user (excluding hidden and deleted)
+messageSchema.methods.getMessagesForUser = function(userId) {
+  return this.messages.filter(msg => {
+    // Check if message is hidden
+    if (msg.isHidden) return false;
+    
+    // Check if message is deleted for this user
+    if (msg.deletedFor && msg.deletedFor.some(d => d.userId.toString() === userId.toString())) {
+      return false;
+    }
+    
+    return true;
+  });
+};
 
 // ===================== STATIC METHODS =====================
 
@@ -404,6 +459,29 @@ messageSchema.statics.getTotalUnreadCount = async function(userId) {
 
   return total;
 };
+
+// ===================== PRE-SAVE MIDDLEWARE =====================
+
+messageSchema.pre('save', function(next) {
+  this.updatedAt = Date.now();
+  this.lastMessageAt = Date.now();
+  
+  if (this.messages.length > 0) {
+    const lastMsg = this.messages[this.messages.length - 1];
+    this.lastMessage = {
+      content: lastMsg.content || '',
+      senderId: lastMsg.senderId,
+      senderType: lastMsg.senderType,
+      senderName: lastMsg.senderName,
+      createdAt: lastMsg.createdAt,
+      mediaType: lastMsg.media && lastMsg.media.length > 0 ? lastMsg.media[0].type : null,
+      callType: lastMsg.callType !== 'none' ? lastMsg.callType : null,
+      callStatus: lastMsg.callStatus !== 'none' ? lastMsg.callStatus : null
+    };
+  }
+  
+  next();
+});
 
 const Message = mongoose.model('Message', messageSchema);
 

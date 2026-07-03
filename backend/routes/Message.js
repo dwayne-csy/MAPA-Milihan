@@ -66,13 +66,6 @@ router.post(
   messageController.addReaction
 );
 
-// Report a message
-router.post(
-  '/conversations/:conversationId/messages/:messageId/report',
-  isAuthenticatedUser,
-  messageController.reportMessage
-);
-
 // ===================== BLOCK/UNBLOCK ROUTES =====================
 
 // Block a user

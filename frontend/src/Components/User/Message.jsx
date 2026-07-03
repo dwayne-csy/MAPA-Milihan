@@ -169,7 +169,13 @@ const UserMessage = () => {
       const response = await axios.get(`${API_BASE_URL}/api/messages/conversations/${conversationId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setMessages(response.data.data.messages || []);
+      
+      let messagesData = response.data.data.messages || [];
+      
+      // Filter out hidden messages
+      messagesData = messagesData.filter(msg => !msg.isHidden);
+      
+      setMessages(messagesData);
       
       if (response.data.data.markedAsRead > 0) {
         setUnreadCounts(prev => ({
@@ -283,7 +289,6 @@ const UserMessage = () => {
   useEffect(() => {
     if (!token) return;
     
-    // Fix: Use correct WebSocket URL
     const wsUrl = `${API_BASE_URL.replace(/^http/, 'ws')}/ws/messages?token=${token}`;
     console.log('🔌 Connecting to WebSocket:', wsUrl);
     const websocket = new WebSocket(wsUrl);
@@ -327,7 +332,9 @@ const UserMessage = () => {
     switch (data.type) {
       case 'new_message':
         if (selectedConversation && data.conversationId === selectedConversation._id) {
-          setMessages(prev => [...prev, data.message]);
+          if (!data.message.isHidden) {
+            setMessages(prev => [...prev, data.message]);
+          }
           markAsRead(data.conversationId);
         } else {
           setUnreadCounts(prev => ({
@@ -506,10 +513,8 @@ const UserMessage = () => {
       return;
     }
 
-    // Store the offer for later use
     callOfferRef.current = offer;
 
-    // Update call state
     setCallState({
       isOpen: true,
       callType: callType || 'audio',
@@ -524,7 +529,6 @@ const UserMessage = () => {
       callStartTime: null
     });
 
-    // Show toast notification with accept/reject buttons
     toast.info(
       <div>
         <p className="font-semibold">Incoming {callType || 'audio'} call from {callerName || 'User'}</p>
@@ -553,7 +557,6 @@ const UserMessage = () => {
     );
   }, [callState.isOpen, ws]);
 
-  // Accept incoming call
   const acceptCall = useCallback(async () => {
     if (!callState.isOpen || callState.isCaller || callState.callStatus !== 'ringing') {
       console.log('Cannot accept call: invalid state', callState);
@@ -562,7 +565,6 @@ const UserMessage = () => {
 
     console.log('📞 Accepting call...');
     try {
-      // Initialize peer connection
       const pc = initPeerConnection();
       if (!pc) {
         console.error('Failed to create peer connection');
@@ -570,7 +572,6 @@ const UserMessage = () => {
         return;
       }
 
-      // Get local media stream
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
         video: callState.callType === 'video'
@@ -581,10 +582,8 @@ const UserMessage = () => {
         await localVideoRef.current.play().catch(console.error);
       }
       
-      // Add tracks to peer connection
       stream.getTracks().forEach(track => pc.addTrack(track, stream));
       
-      // Set remote description from offer
       if (!callOfferRef.current) {
         console.error('No call offer available');
         toast.error('No call offer available');
@@ -594,12 +593,10 @@ const UserMessage = () => {
       await pc.setRemoteDescription(new RTCSessionDescription(callOfferRef.current));
       console.log('✅ Remote description set');
       
-      // Create and set local description (answer)
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
       console.log('✅ Local description set');
       
-      // Send answer to caller
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({
           type: 'call_answer',
@@ -627,7 +624,6 @@ const UserMessage = () => {
     }
   }, [callState, initPeerConnection, ws]);
 
-  // Reject incoming call
   const rejectCall = useCallback(() => {
     if (callState.isOpen && ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({
@@ -757,26 +753,22 @@ const UserMessage = () => {
     
     console.log('📞 Ending call...');
     
-    // Stop local tracks
     if (localVideoRef.current && localVideoRef.current.srcObject) {
       const tracks = localVideoRef.current.srcObject.getTracks();
       tracks.forEach(track => track.stop());
       localVideoRef.current.srcObject = null;
     }
     
-    // Clear remote video
     if (remoteVideoRef.current && remoteVideoRef.current.srcObject) {
       remoteVideoRef.current.srcObject = null;
     }
     
-    // Close peer connection
     if (peerConnectionRef.current) {
       peerConnectionRef.current.close();
       peerConnectionRef.current = null;
       console.log('🔒 Peer connection closed');
     }
     
-    // Determine call status for history
     if (callState.callStatus === 'ringing' && callState.isCaller) {
       callStatus = 'missed';
     } else if (callState.callStatus === 'ringing' && !callState.isCaller) {
@@ -790,12 +782,10 @@ const UserMessage = () => {
       callStatus = 'missed';
     }
     
-    // Send call message if call was open
     if (callState.isOpen) {
       await sendCallMessage(callStatus, duration);
     }
     
-    // Notify other party
     if (callState.isOpen && ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({
         type: 'call_end',
@@ -805,7 +795,6 @@ const UserMessage = () => {
       console.log('📤 Call end notification sent');
     }
     
-    // Reset call state
     setCallState({
       isOpen: false,
       callType: null,
@@ -923,7 +912,9 @@ const UserMessage = () => {
       setMediaFiles([]);
       setReplyingTo(null);
       const sentMessage = response.data.data.messages[response.data.data.messages.length - 1];
-      setMessages(prev => [...prev, sentMessage]);
+      if (!sentMessage.isHidden) {
+        setMessages(prev => [...prev, sentMessage]);
+      }
       fetchConversations();
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({
@@ -1048,24 +1039,82 @@ const UserMessage = () => {
     }
   };
 
+  // ===== FIXED REPORT MESSAGE FUNCTION =====
   const reportMessage = async () => {
+    console.log('📝 reportMessage called');
+    console.log('reportReason:', reportReason);
+    console.log('selectedMessage:', selectedMessage);
+    console.log('selectedConversation:', selectedConversation);
+
+    // Validate reason is selected
     if (!reportReason) {
-      toast.error('Please select a reason');
+      toast.error('Please select a reason for reporting');
       return;
     }
+
+    // Validate we have a selected message
+    if (!selectedMessage || !selectedMessage._id) {
+      toast.error('No message selected to report');
+      return;
+    }
+
+    // Validate we have a selected conversation
+    if (!selectedConversation || !selectedConversation._id) {
+      toast.error('No conversation selected');
+      return;
+    }
+
     try {
-      await axios.post(
+      console.log('📤 Sending report request...');
+      const response = await axios.post(
         `${API_BASE_URL}/api/messages/conversations/${selectedConversation._id}/messages/${selectedMessage._id}/report`,
-        { reason: reportReason, description: reportDescription },
+        { 
+          reason: reportReason, 
+          description: reportDescription || '' 
+        },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setShowReportModal(false);
-      setReportReason('');
-      setReportDescription('');
-      toast.success('Message reported');
+
+      console.log('✅ Report response:', response.data);
+
+      if (response.data.success) {
+        toast.success('Message reported successfully');
+        // Close modal and reset state
+        setShowReportModal(false);
+        setReportReason('');
+        setReportDescription('');
+        setSelectedMessage(null);
+        setShowOptions(false);
+      } else {
+        toast.error(response.data.message || 'Failed to report message');
+      }
     } catch (error) {
-      console.error('Error reporting message:', error);
-      toast.error('Failed to report message');
+      console.error('❌ Error reporting message:', error);
+      console.error('Error response:', error.response);
+      if (error.response?.data?.message) {
+        toast.error(error.response.data.message);
+      } else if (error.response?.data?.error) {
+        toast.error(error.response.data.error);
+      } else {
+        toast.error('Failed to report message. Please try again.');
+      }
+    }
+  };
+
+  // ===== FIXED HANDLE KEY PRESS =====
+  const handleKeyPress = (e) => {
+    // If report modal is open, don't send message on Enter
+    if (showReportModal) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        reportMessage();
+      }
+      return;
+    }
+    
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
     }
   };
 
@@ -1089,13 +1138,6 @@ const UserMessage = () => {
       }
     }, 2000);
     setTypingTimeout(timeout);
-  };
-
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
   };
 
   // ========== DERIVED VALUES ==========
@@ -1124,15 +1166,6 @@ const UserMessage = () => {
     if (typeof avatar === 'string') return avatar;
     if (typeof avatar === 'object' && avatar.url) return avatar.url;
     return null;
-  };
-
-  const getRoleBadge = (userType) => {
-    const styles = {
-      Farmer: 'bg-orange-100 text-orange-700',
-      Admin: 'bg-purple-100 text-purple-700',
-      User: 'bg-blue-100 text-blue-700'
-    };
-    return <span className={`text-[10px] px-2 py-0.5 rounded-full ${styles[userType] || styles.User}`}>{userType || 'User'}</span>;
   };
 
   const isUserOnline = (userId) => onlineUsers[userId] || false;
@@ -1461,7 +1494,6 @@ const UserMessage = () => {
                                 ))}
                               </div>
                             )}
-                            {/* Call status display */}
                             {msg.callType && msg.callType !== 'none' && (
                               <div className="flex items-center gap-2 text-sm mt-1">
                                 {msg.callType === 'audio' ? (
@@ -1593,7 +1625,14 @@ const UserMessage = () => {
                   </button>
                 </>
               )}
-              <button onClick={() => { setShowReportModal(true); setShowOptions(false); }} className="flex items-center gap-2 w-full p-2 text-sm hover:bg-gray-50 rounded">
+              <button 
+                onClick={() => { 
+                  console.log('📤 Opening report modal for message:', selectedMessage);
+                  setShowReportModal(true); 
+                  setShowOptions(false);
+                }} 
+                className="flex items-center gap-2 w-full p-2 text-sm hover:bg-gray-50 rounded"
+              >
                 <FiFlag size={16} /> Report
               </button>
             </div>
@@ -1619,13 +1658,24 @@ const UserMessage = () => {
         </div>
       )}
 
+      {/* ===== FIXED REPORT MODAL ===== */}
       {showReportModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setShowReportModal(false)}>
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => {
+          console.log('❌ Closing report modal (clicked outside)');
+          setShowReportModal(false);
+          setReportReason('');
+          setReportDescription('');
+          setSelectedMessage(null);
+        }}>
           <div className="bg-white rounded-lg p-5 w-80 max-w-[90%]" onClick={e => e.stopPropagation()}>
             <h3 className="text-sm font-semibold text-gray-800 mb-3">Report Message</h3>
             <div className="mb-3">
-              <label className="text-xs font-medium text-gray-700 block mb-1">Reason</label>
-              <select value={reportReason} onChange={(e) => setReportReason(e.target.value)} className="w-full p-2 text-sm border border-gray-200 rounded focus:ring-1 focus:ring-green-500 outline-none">
+              <label className="text-xs font-medium text-gray-700 block mb-1">Reason *</label>
+              <select 
+                value={reportReason} 
+                onChange={(e) => setReportReason(e.target.value)} 
+                className="w-full p-2 text-sm border border-gray-200 rounded focus:ring-1 focus:ring-green-500 outline-none"
+              >
                 <option value="">Select a reason</option>
                 <option value="Spam">Spam</option>
                 <option value="Harassment">Harassment</option>
@@ -1636,11 +1686,34 @@ const UserMessage = () => {
             </div>
             <div className="mb-4">
               <label className="text-xs font-medium text-gray-700 block mb-1">Description (Optional)</label>
-              <textarea value={reportDescription} onChange={(e) => setReportDescription(e.target.value)} rows="3" className="w-full p-2 text-sm border border-gray-200 rounded focus:ring-1 focus:ring-green-500 outline-none resize-none" placeholder="Add details..." />
+              <textarea 
+                value={reportDescription} 
+                onChange={(e) => setReportDescription(e.target.value)} 
+                rows="3" 
+                className="w-full p-2 text-sm border border-gray-200 rounded focus:ring-1 focus:ring-green-500 outline-none resize-none" 
+                placeholder="Add details..." 
+              />
             </div>
             <div className="flex gap-2">
-              <button className="flex-1 p-2 text-sm bg-gray-100 hover:bg-gray-200 rounded" onClick={() => setShowReportModal(false)}>Cancel</button>
-              <button className="flex-1 p-2 text-sm bg-red-500 text-white hover:bg-red-600 rounded" onClick={reportMessage}>Report</button>
+              <button 
+                className="flex-1 p-2 text-sm bg-gray-100 hover:bg-gray-200 rounded" 
+                onClick={() => {
+                  console.log('❌ Cancelling report');
+                  setShowReportModal(false);
+                  setReportReason('');
+                  setReportDescription('');
+                  setSelectedMessage(null);
+                }}
+              >
+                Cancel
+              </button>
+              <button 
+                className="flex-1 p-2 text-sm bg-red-500 text-white hover:bg-red-600 rounded disabled:opacity-50 disabled:cursor-not-allowed" 
+                onClick={reportMessage}
+                disabled={!reportReason}
+              >
+                Report
+              </button>
             </div>
           </div>
         </div>
