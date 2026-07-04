@@ -8,13 +8,19 @@ import CloseIcon from '@mui/icons-material/Close';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import ShoppingBagIcon from '@mui/icons-material/ShoppingBag';
 import AssignmentIcon from '@mui/icons-material/Assignment';
-import MessageIcon from '@mui/icons-material/Message'; // Add this import
+import MessageIcon from '@mui/icons-material/Message';
+import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
+import MapIcon from '@mui/icons-material/Map';
+import Badge from '@mui/material/Badge';
+import logo from '../logo/logo.png'; // Import the logo
 
 const FarmerHeader = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [cartCount, setCartCount] = useState(0);
+  const [logoError, setLogoError] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -39,6 +45,7 @@ const FarmerHeader = () => {
 
         if (response.ok && data.user) {
           setUser(data.user);
+          fetchCartCount();
         } else {
           localStorage.removeItem('token');
           localStorage.removeItem('user');
@@ -54,6 +61,34 @@ const FarmerHeader = () => {
     fetchUserData();
   }, [navigate, API_BASE_URL]);
 
+  const fetchCartCount = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      const response = await fetch(`${API_BASE_URL}/api/v1/cart/count`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setCartCount(data.count || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching cart count:', error);
+    }
+  };
+
+  // Refresh cart count when navigating to cart or product pages
+  useEffect(() => {
+    if (location.pathname === '/cart' || location.pathname === '/farmer/product') {
+      fetchCartCount();
+    }
+  }, [location.pathname]);
+
   const toggleDropdown = () => setDropdownOpen(!dropdownOpen);
   const toggleMobileMenu = () => setMobileMenuOpen(!mobileMenuOpen);
 
@@ -61,6 +96,7 @@ const FarmerHeader = () => {
     { label: 'Home', path: '/farmer/dashboard' },
     { label: 'Products', path: '/farmer/product' },
     { label: 'Forums', path: '/farmer/forum' },
+    { label: 'Mapping', path: '/farmer/maps' },
   ];
 
   const handleLogout = () => {
@@ -69,8 +105,12 @@ const FarmerHeader = () => {
     navigate('/login');
   };
 
+  const handleCartClick = () => {
+    navigate('/cart');
+  };
+
   const handleMessage = () => {
-    navigate('/farner/messages'); // Adjust the path as needed
+    navigate('/farmer/messages');
   };
 
   const dropdownItems = [
@@ -80,9 +120,9 @@ const FarmerHeader = () => {
       action: () => navigate('/farmer/orderlist')
     },
     { 
-      label: 'Messages', // Added Message button
+      label: 'Messages',
       icon: MessageIcon,
-      action: () => navigate('/farmer/messages')
+      action: handleMessage
     },
     { 
       label: 'Edit Profile', 
@@ -179,11 +219,15 @@ const FarmerHeader = () => {
           text-shadow: 0 2px 10px rgba(255, 255, 255, 0.3);
         }
 
-        .system-title .title-icon {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: #a7f3d0;
+        .system-title .title-logo {
+          height: 40px;
+          width: auto;
+          border-radius: 8px;
+          transition: transform 0.3s ease;
+        }
+
+        .system-title:hover .title-logo {
+          transform: scale(1.05);
         }
 
         .system-title .title-text {
@@ -249,6 +293,50 @@ const FarmerHeader = () => {
           height: 3px;
           background: white;
           border-radius: 2px;
+        }
+
+        /* Cart Button */
+        .cart-btn {
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 8px;
+          border-radius: 50%;
+          color: rgba(255, 255, 255, 0.85);
+          transition: all 0.3s ease;
+          background: rgba(255, 255, 255, 0.08);
+          margin-right: 0.5rem;
+        }
+
+        .cart-btn:hover {
+          background: rgba(255, 255, 255, 0.2);
+          transform: translateY(-2px);
+          color: white;
+        }
+
+        .cart-btn .cart-icon {
+          width: 24px;
+          height: 24px;
+        }
+
+        .cart-badge {
+          position: absolute;
+          top: -4px;
+          right: -4px;
+          background: #ef4444;
+          color: white;
+          font-size: 0.6rem;
+          font-weight: 700;
+          min-width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 4px;
+          box-shadow: 0 2px 6px rgba(239, 68, 68, 0.4);
+          border: 2px solid #059669;
         }
 
         /* Dropdown Container */
@@ -389,7 +477,7 @@ const FarmerHeader = () => {
         .user-section {
           display: flex;
           align-items: center;
-          gap: 0.75rem;
+          gap: 0.5rem;
         }
 
         /* Mobile Menu Button */
@@ -422,12 +510,13 @@ const FarmerHeader = () => {
 
         .mobile-nav.open {
           display: flex;
-          max-height: 500px;
+          max-height: 600px;
         }
 
         .mobile-nav-link {
           display: flex;
           align-items: center;
+          justify-content: center;
           color: rgba(255, 255, 255, 0.85);
           padding: 14px 2rem;
           font-weight: 500;
@@ -447,7 +536,39 @@ const FarmerHeader = () => {
           font-weight: 600;
         }
 
-        /* Mobile Dropdown Items */
+        /* Mobile Cart Link */
+        .mobile-cart-link {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          color: rgba(255, 255, 255, 0.85);
+          padding: 14px 2rem;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .mobile-cart-link:hover {
+          background: rgba(255, 255, 255, 0.08);
+          color: white;
+        }
+
+        .mobile-cart-link .cart-badge-mobile {
+          background: #ef4444;
+          color: white;
+          font-size: 0.65rem;
+          font-weight: 700;
+          min-width: 20px;
+          height: 20px;
+          border-radius: 50%;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 4px;
+        }
+
         .mobile-dropdown-item {
           display: flex;
           align-items: center;
@@ -514,8 +635,8 @@ const FarmerHeader = () => {
             font-size: 1.2rem;
           }
 
-          .system-title .title-icon {
-            font-size: 1.4rem;
+          .system-title .title-logo {
+            height: 32px;
           }
 
           .system-title .farmer-badge {
@@ -546,6 +667,23 @@ const FarmerHeader = () => {
             height: 30px;
             font-size: 0.7rem;
           }
+
+          .cart-btn {
+            padding: 6px;
+          }
+
+          .cart-btn .cart-icon {
+            width: 20px;
+            height: 20px;
+          }
+
+          .cart-badge {
+            min-width: 16px;
+            height: 16px;
+            font-size: 0.5rem;
+            top: -3px;
+            right: -3px;
+          }
         }
 
         @media (max-width: 480px) {
@@ -553,8 +691,8 @@ const FarmerHeader = () => {
             font-size: 1rem;
           }
 
-          .system-title .title-icon {
-            font-size: 1.2rem;
+          .system-title .title-logo {
+            height: 28px;
           }
 
           .system-title .farmer-badge {
@@ -566,11 +704,8 @@ const FarmerHeader = () => {
             height: 55px;
           }
 
-          .mobile-nav-link {
-            padding: 12px 1.5rem;
-            font-size: 0.9rem;
-          }
-
+          .mobile-nav-link,
+          .mobile-cart-link,
           .mobile-dropdown-item {
             padding: 12px 1.5rem;
             font-size: 0.9rem;
@@ -580,11 +715,18 @@ const FarmerHeader = () => {
 
       <header className="farmer-header">
         <div className="header-container">
-          {/* System Title */}
+          {/* System Title with Logo */}
           <div className="system-title" onClick={() => navigate('/farmer/dashboard')}>
-            <span className="title-icon">
-              <AccountCircleIcon sx={{ fontSize: '1.8rem' }} />
-            </span>
+            {!logoError ? (
+              <img 
+                src={logo} 
+                alt="MAPA-Milihan Logo" 
+                className="title-logo"
+                onError={() => setLogoError(true)}
+              />
+            ) : (
+              <span className="title-icon" style={{ fontSize: '1.8rem', color: '#a7f3d0' }}>🌾</span>
+            )}
             <span className="title-text">MAPA-Milihan</span>
             <span className="farmer-badge">FARMER</span>
           </div>
@@ -604,6 +746,14 @@ const FarmerHeader = () => {
 
           {/* User Profile Dropdown Section */}
           <div className="user-section">
+            {/* Cart Button */}
+            <button className="cart-btn" onClick={handleCartClick} title="View Cart">
+              <ShoppingCartIcon className="cart-icon" />
+              {cartCount > 0 && (
+                <span className="cart-badge">{cartCount > 99 ? '99+' : cartCount}</span>
+              )}
+            </button>
+
             <div className="dropdown-container">
               <button className="dropdown-trigger" onClick={toggleDropdown}>
                 <div className="user-avatar">
@@ -672,6 +822,21 @@ const FarmerHeader = () => {
               {item.label}
             </div>
           ))}
+          
+          {/* Mobile Cart Link */}
+          <div
+            className="mobile-cart-link"
+            onClick={() => {
+              navigate('/cart');
+              setMobileMenuOpen(false);
+            }}
+          >
+            <ShoppingCartIcon sx={{ fontSize: '1.2rem' }} />
+            Cart
+            {cartCount > 0 && (
+              <span className="cart-badge-mobile">{cartCount > 99 ? '99+' : cartCount}</span>
+            )}
+          </div>
           
           <div className="mobile-divider"></div>
           
