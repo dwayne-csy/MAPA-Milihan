@@ -11,6 +11,7 @@ import AssignmentIcon from '@mui/icons-material/Assignment';
 import MessageIcon from '@mui/icons-material/Message';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import MapIcon from '@mui/icons-material/Map';
+import AssessmentIcon from '@mui/icons-material/Assessment'; // Add this import for Reports
 import Badge from '@mui/material/Badge';
 import logo from '../logo/logo.png'; // Import the logo
 
@@ -113,6 +114,10 @@ const FarmerHeader = () => {
     navigate('/farmer/messages');
   };
 
+  const handleReports = () => {
+    navigate('/farmer/report'); // Adjust path as needed
+  };
+
   const dropdownItems = [
     { 
       label: 'Manage Orders', 
@@ -123,6 +128,11 @@ const FarmerHeader = () => {
       label: 'Messages',
       icon: MessageIcon,
       action: handleMessage
+    },
+    { 
+      label: 'Reports', // Added Reports option
+      icon: AssessmentIcon,
+      action: handleReports
     },
     { 
       label: 'Edit Profile', 

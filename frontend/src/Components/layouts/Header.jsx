@@ -5,7 +5,8 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import HistoryIcon from '@mui/icons-material/History';
-import MessageIcon from '@mui/icons-material/Message'; // Add this import
+import MessageIcon from '@mui/icons-material/Message';
+import AssessmentIcon from '@mui/icons-material/Assessment'; // Add this import for report
 import Badge from '@mui/material/Badge';
 import logo from '../logo/logo.png';
 
@@ -116,7 +117,12 @@ const Header = () => {
   };
 
   const handleMessages = () => {
-    navigate('/messages'); // Adjust the path as needed
+    navigate('/messages');
+    setProfileMenuOpen(false);
+  };
+
+  const handleReport = () => {
+    navigate('/report'); // Adjust path as needed
     setProfileMenuOpen(false);
   };
 
@@ -127,9 +133,14 @@ const Header = () => {
       action: handleOrderHistory
     },
     { 
-      label: 'Messages', // Added Messages button
+      label: 'Messages',
       icon: MessageIcon,
       action: handleMessages
+    },
+    { 
+      label: 'Reports', // Added Report button
+      icon: AssessmentIcon,
+      action: handleReport
     },
     { 
       label: 'Edit Profile', 
