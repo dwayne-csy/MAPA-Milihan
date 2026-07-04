@@ -38,6 +38,7 @@ import ManageUser from "./Components/Admin/ManageUser";
 import FarmerProduct from "./Components/Farmer/products/FarmerProduct";
 import FarmerProductDetails from "./Components/Farmer/products/FarmerProductDetails";
 import FarmerMaps from "./Components/Farmer/FarmerMaps";
+import FarmerCart from "./Components/Farmer/FarmerCart";
 
 // Profile wrapper component to determine which profile to show
 const ProfileWrapper = () => {
@@ -105,6 +106,7 @@ const App = () => {
         <Route path="/farmer/product" element={<ProtectedRoute requiredRole="farmer"><FarmerProduct /></ProtectedRoute>} />
         <Route path="/farmer/product/:id" element={<ProtectedRoute requiredRole="farmer"><FarmerProductDetails /></ProtectedRoute>} />
         <Route path="/farmer/maps" element={<ProtectedRoute requiredRole="farmer"><FarmerMaps /></ProtectedRoute>} />
+        <Route path="/farmer/cart" element={<ProtectedRoute requiredRole="farmer"><FarmerCart /></ProtectedRoute>} />
 
         {/* Farmer Messages Route */}
         <Route path="/farmer/messages" element={<ProtectedRoute requiredRole="farmer"><FarmerMessage /></ProtectedRoute>} />

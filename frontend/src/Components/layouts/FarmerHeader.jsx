@@ -84,7 +84,7 @@ const FarmerHeader = () => {
 
   // Refresh cart count when navigating to cart or product pages
   useEffect(() => {
-    if (location.pathname === '/cart' || location.pathname === '/farmer/product') {
+    if (location.pathname === '/farmer/cart' || location.pathname === '/farmer/cart') {
       fetchCartCount();
     }
   }, [location.pathname]);
@@ -106,7 +106,7 @@ const FarmerHeader = () => {
   };
 
   const handleCartClick = () => {
-    navigate('/cart');
+    navigate('/farmer/cart');
   };
 
   const handleMessage = () => {
