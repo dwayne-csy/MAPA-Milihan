@@ -948,7 +948,7 @@ const CreateProduct = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => navigate('/farmer/products')}
+                  onClick={() => navigate('/farmer/product')}
                   className="cp-btn cp-btn-secondary"
                 >
                   Cancel

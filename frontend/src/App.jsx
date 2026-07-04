@@ -11,7 +11,6 @@ import ForgotPassword from "./Components/Auth/ForgotPassword";
 import ResetPassword from "./Components/Auth/ResetPassword";
 import ChangePassword from "./Components/User/ChangePassword";
 import Dashboard from "./Components/Farmer/Dashboard";
-import ProductList from "./Components/Farmer/products/ProductList";
 import CreateProduct from "./Components/Farmer/products/CreateProduct";
 import UpdateProduct from "./Components/Farmer/products/UpdateProduct";
 import FarmerEditProfile from "./Components/Farmer/FarmerEditProfile";
@@ -36,6 +35,8 @@ import ManageReport from "./Components/Admin/ManageReport";
 import Call from "./Components/User/Call";
 import FarmerCall from "./Components/Farmer/FarmerCall";
 import ManageUser from "./Components/Admin/ManageUser";
+import FarmerProduct from "./Components/Farmer/products/FarmerProduct";
+import FarmerProductDetails from "./Components/Farmer/products/FarmerProductDetails";
 
 // Profile wrapper component to determine which profile to show
 const ProfileWrapper = () => {
@@ -93,7 +94,6 @@ const App = () => {
         
         {/* Farmer Protected Routes */}
         <Route path="/farmer/dashboard" element={<ProtectedRoute requiredRole="farmer"><Dashboard /></ProtectedRoute>} />
-        <Route path="/farmer/productlist" element={<ProtectedRoute requiredRole="farmer"><ProductList /></ProtectedRoute>} />
         <Route path="/farmer/create-product" element={<ProtectedRoute requiredRole="farmer"><CreateProduct /></ProtectedRoute>} />
         <Route path="/farmer/update-product/:id" element={<ProtectedRoute requiredRole="farmer"><UpdateProduct /></ProtectedRoute>} />
         <Route path="/farmer/edit-profile" element={<ProtectedRoute requiredRole="farmer"><FarmerEditProfile /></ProtectedRoute>} />
@@ -101,6 +101,8 @@ const App = () => {
         <Route path="/farmer/forum" element={<ProtectedRoute requiredRole="farmer"><FarmerForum /></ProtectedRoute>} />
         <Route path="/farmer/orderlist" element={<ProtectedRoute requiredRole="farmer"><OrderList /></ProtectedRoute>} />
         <Route path="/farmer/order/:id" element={<ProtectedRoute requiredRole="farmer"><ViewOrder /></ProtectedRoute>} />
+        <Route path="/farmer/product" element={<ProtectedRoute requiredRole="farmer"><FarmerProduct /></ProtectedRoute>} />
+        <Route path="/farmer/product/:id" element={<ProtectedRoute requiredRole="farmer"><FarmerProductDetails /></ProtectedRoute>} />
         
         {/* Farmer Messages Route */}
         <Route path="/farmer/messages" element={<ProtectedRoute requiredRole="farmer"><FarmerMessage /></ProtectedRoute>} />

@@ -829,7 +829,7 @@ const UpdateProduct = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => navigate('/farmer/products')}
+                  onClick={() => navigate('/farmer/product')}
                   className="upd-btn upd-btn-secondary"
                 >
                   Cancel
