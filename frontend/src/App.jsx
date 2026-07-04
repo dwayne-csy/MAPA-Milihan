@@ -32,8 +32,6 @@ import FProfile from "./Components/Farmer/FProfile";
 import UserMessage from "./Components/User/Message";
 import FarmerMessage from "./Components/Farmer/FarmerMessage";
 import ManageReport from "./Components/Admin/ManageReport";
-import Call from "./Components/User/Call";
-import FarmerCall from "./Components/Farmer/FarmerCall";
 import ManageUser from "./Components/Admin/ManageUser";
 import FarmerProduct from "./Components/Farmer/products/FarmerProduct";
 import FarmerProductDetails from "./Components/Farmer/products/FarmerProductDetails";
@@ -92,7 +90,6 @@ const App = () => {
         {/* User Messages Route */}
         <Route path="/messages" element={<ProtectedRoute><UserMessage /></ProtectedRoute>} />
         <Route path="/messages/:userId" element={<ProtectedRoute><UserMessage /></ProtectedRoute>} />
-        <Route path="/call/:userId" element={<ProtectedRoute><Call /></ProtectedRoute>} />
         
         {/* Farmer Protected Routes */}
         <Route path="/farmer/dashboard" element={<ProtectedRoute requiredRole="farmer"><Dashboard /></ProtectedRoute>} />
@@ -111,7 +108,6 @@ const App = () => {
         {/* Farmer Messages Route */}
         <Route path="/farmer/messages" element={<ProtectedRoute requiredRole="farmer"><FarmerMessage /></ProtectedRoute>} />
         <Route path="/farmer/messages/:userId" element={<ProtectedRoute requiredRole="farmer"><FarmerMessage /></ProtectedRoute>} />
-        <Route path="/farmer/call/:userId" element={<ProtectedRoute requiredRole="farmer"><FarmerCall /></ProtectedRoute>} />
 
         {/* Admin Protected Routes */}
         <Route path="/admin/dashboard" element={<ProtectedRoute requiredRole="admin"><AdminDashboard /></ProtectedRoute>} />

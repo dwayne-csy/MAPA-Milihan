@@ -141,7 +141,7 @@ const getIdString = (id) => {
 // ========== SEND MESSAGE ==========
 exports.sendMessage = async (req, res) => {
   try {
-    const { receiverId, receiverType, receiverName, content, replyToMessageId, callType, callStatus, callDuration } = req.body;
+    const { receiverId, receiverType, receiverName, content, replyToMessageId } = req.body;
     const senderId = req.user.id;
     
     const senderType = getUserTypeFromRole(req.user);
@@ -256,9 +256,6 @@ exports.sendMessage = async (req, res) => {
       media: mediaUrls,
       isRead: false,
       replyTo: replyTo,
-      callType: callType || 'none',
-      callStatus: callStatus || 'none',
-      callDuration: callDuration || 0,
       createdAt: new Date(),
       updatedAt: new Date()
     };
@@ -968,166 +965,6 @@ exports.getUnreadCount = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error getting unread count',
-      error: error.message
-    });
-  }
-};
-
-// ========== SEND CALL MESSAGE ==========
-exports.sendCallMessage = async (req, res) => {
-  try {
-    const { receiverId, receiverType, receiverName, callType, callStatus, callDuration } = req.body;
-    const senderId = req.user.id;
-    
-    const senderType = getUserTypeFromRole(req.user);
-    const senderName = req.user.name || req.user.username || 'User';
-
-    console.log(`📞 Sending call message from ${senderId} to ${receiverId}`);
-    console.log(`📞 Call type: ${callType}, Status: ${callStatus}`);
-
-    if (!receiverId || !receiverType) {
-      return res.status(400).json({
-        success: false,
-        message: 'Receiver ID and type are required'
-      });
-    }
-
-    const validTypes = ['User', 'Farmer', 'Admin'];
-    let normalizedReceiverType = receiverType;
-    const foundType = validTypes.find(t => t.toLowerCase() === receiverType.toLowerCase());
-    if (foundType) {
-      normalizedReceiverType = foundType;
-    }
-
-    const finalReceiverType = normalizedReceiverType;
-
-    // Find or create conversation
-    let conversation = await Message.findOne({
-      participants: {
-        $all: [
-          { $elemMatch: { userId: senderId, userType: senderType } },
-          { $elemMatch: { userId: receiverId, userType: finalReceiverType } }
-        ]
-      }
-    });
-
-    if (!conversation) {
-      conversation = new Message({
-        participants: [
-          {
-            userId: senderId,
-            userType: senderType,
-            name: senderName,
-            avatar: req.user.avatar?.url || null
-          },
-          {
-            userId: receiverId,
-            userType: finalReceiverType,
-            name: receiverName || 'User',
-            avatar: null
-          }
-        ],
-        messages: [],
-        lastMessageAt: Date.now()
-      });
-    }
-
-    // Create call message
-    const message = {
-      senderId: senderId,
-      senderType: senderType,
-      senderName: senderName,
-      content: '',
-      media: [],
-      isRead: false,
-      replyTo: null,
-      callType: callType || 'audio',
-      callStatus: callStatus || 'missed',
-      callDuration: callDuration || 0,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    conversation.messages.push(message);
-    conversation.lastMessageAt = new Date();
-    
-    await conversation.save();
-    console.log(`✅ Call message saved with ID: ${message._id}`);
-
-    const populatedConversation = await Message.findById(conversation._id)
-      .populate('participants.userId', 'name email avatar')
-      .lean();
-
-    const sentMessage = populatedConversation.messages[populatedConversation.messages.length - 1];
-
-    // Send real-time notification via WebSocket
-    if (wsServer) {
-      try {
-        wsServer.notifyNewMessage(conversation._id.toString(), sentMessage);
-        console.log(`📨 WebSocket notification sent for call message ${sentMessage._id}`);
-      } catch (wsError) {
-        console.error('❌ Error sending WebSocket notification:', wsError);
-      }
-    }
-
-    res.status(201).json({
-      success: true,
-      message: 'Call message sent successfully',
-      data: populatedConversation
-    });
-  } catch (error) {
-    console.error('❌ Send call message error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error sending call message',
-      error: error.message
-    });
-  }
-};
-
-// ========== GET CALL HISTORY ==========
-exports.getCallHistory = async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const limit = parseInt(req.query.limit) || 50;
-
-    const conversations = await Message.find({
-      'participants.userId': userId
-    })
-      .populate('participants.userId', 'name email avatar')
-      .lean();
-
-    const callHistory = [];
-    conversations.forEach(conv => {
-      conv.messages.forEach(msg => {
-        if (msg.callType && msg.callType !== 'none') {
-          const otherParticipant = conv.participants.find(
-            p => getIdString(p.userId?._id) !== userId.toString()
-          );
-          callHistory.push({
-            conversationId: conv._id,
-            messageId: msg._id,
-            callType: msg.callType,
-            callStatus: msg.callStatus,
-            callDuration: msg.callDuration,
-            createdAt: msg.createdAt,
-            otherParticipant: otherParticipant || null
-          });
-        }
-      });
-    });
-
-    callHistory.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-    res.status(200).json({
-      success: true,
-      data: callHistory.slice(0, limit)
-    });
-  } catch (error) {
-    console.error('Get call history error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching call history',
       error: error.message
     });
   }

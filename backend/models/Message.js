@@ -91,20 +91,6 @@ const messageSchema = new mongoose.Schema({
         type: String
       }
     }],
-    callType: {
-      type: String,
-      enum: ['audio', 'video', 'none'],
-      default: 'none'
-    },
-    callDuration: {
-      type: Number,
-      default: 0
-    },
-    callStatus: {
-      type: String,
-      enum: ['missed', 'answered', 'rejected', 'cancelled', 'ongoing', 'none'],
-      default: 'none'
-    },
     isRead: {
       type: Boolean,
       default: false
@@ -278,12 +264,6 @@ const messageSchema = new mongoose.Schema({
       type: Date
     },
     mediaType: {
-      type: String
-    },
-    callType: {
-      type: String
-    },
-    callStatus: {
       type: String
     }
   },
@@ -474,9 +454,7 @@ messageSchema.pre('save', function(next) {
       senderType: lastMsg.senderType,
       senderName: lastMsg.senderName,
       createdAt: lastMsg.createdAt,
-      mediaType: lastMsg.media && lastMsg.media.length > 0 ? lastMsg.media[0].type : null,
-      callType: lastMsg.callType !== 'none' ? lastMsg.callType : null,
-      callStatus: lastMsg.callStatus !== 'none' ? lastMsg.callStatus : null
+      mediaType: lastMsg.media && lastMsg.media.length > 0 ? lastMsg.media[0].type : null
     };
   }
   

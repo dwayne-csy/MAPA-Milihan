@@ -82,20 +82,4 @@ router.post(
   messageController.unblockUser
 );
 
-// ===================== CALL ROUTES =====================
-
-// Send call message (missed/answered call)
-router.post(
-  '/call/message',
-  isAuthenticatedUser,
-  messageController.sendCallMessage
-);
-
-// Get call history
-router.get(
-  '/calls/history',
-  isAuthenticatedUser,
-  messageController.getCallHistory
-);
-
 module.exports = router;

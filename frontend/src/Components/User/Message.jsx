@@ -4,7 +4,6 @@ import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import UserHeader from '../layouts/Header';
-import Call from './Call';
 import { 
   FiSend, 
   FiPaperclip, 
@@ -12,8 +11,6 @@ import {
   FiTrash2,
   FiFlag,
   FiSmile,
-  FiPhone,
-  FiVideo,
   FiX,
   FiCheck,
   FiCheckCircle,
@@ -58,29 +55,10 @@ const UserMessage = () => {
   const [initializing, setInitializing] = useState(false);
   const isCreatingConversationRef = useRef(false);
   const initializedRef = useRef(false);
-  const callOfferRef = useRef(null);
-
-  // Call states
-  const [callState, setCallState] = useState({
-    isOpen: false,
-    callType: null,
-    callId: null,
-    targetUserId: null,
-    targetUserName: '',
-    targetUserAvatar: null,
-    isCaller: false,
-    callStatus: 'idle',
-    isVideoEnabled: true,
-    isAudioEnabled: true,
-    callStartTime: null
-  });
 
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const messageInputRef = useRef(null);
-  const localVideoRef = useRef(null);
-  const remoteVideoRef = useRef(null);
-  const peerConnectionRef = useRef(null);
   const token = localStorage.getItem('token');
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001';
 
@@ -366,471 +344,9 @@ const UserMessage = () => {
           setOnlineUsers(onlineMap);
         }
         break;
-      case 'call_offer': handleCallOffer(data); break;
-      case 'call_answer': handleCallAnswer(data); break;
-      case 'call_ice_candidate': handleIceCandidate(data); break;
-      case 'call_end': handleCallEnd(data); break;
-      case 'call_error':
-        toast.error(data.message || 'Call error occurred');
-        setCallState(prev => ({ ...prev, isOpen: false, callStatus: 'idle' }));
-        break;
       default: break;
     }
   };
-
-  // ===== WebRTC Call Methods =====
-  const initPeerConnection = useCallback(() => {
-    const configuration = {
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
-      ]
-    };
-    const pc = new RTCPeerConnection(configuration);
-
-    pc.onicecandidate = (event) => {
-      if (event.candidate && ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({
-          type: 'call_ice_candidate',
-          callId: callState.callId,
-          candidate: event.candidate,
-          targetUserId: callState.targetUserId
-        }));
-        console.log('🧊 ICE candidate sent');
-      }
-    };
-
-    pc.ontrack = (event) => {
-      if (remoteVideoRef.current && event.streams[0]) {
-        remoteVideoRef.current.srcObject = event.streams[0];
-        remoteVideoRef.current.play().catch(console.error);
-        console.log('📹 Remote stream received');
-      }
-    };
-
-    pc.onconnectionstatechange = () => {
-      console.log('🔗 Connection state:', pc.connectionState);
-      if (pc.connectionState === 'connected') {
-        setCallState(prev => ({ 
-          ...prev, 
-          callStatus: 'connected',
-          callStartTime: Date.now()
-        }));
-        toast.success('Call connected!');
-      } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
-        endCall();
-      }
-    };
-
-    peerConnectionRef.current = pc;
-    return pc;
-  }, [ws, callState.callId, callState.targetUserId]);
-
-  const startCall = useCallback(async (callType) => {
-    if (!selectedConversation) {
-      toast.error('No conversation selected');
-      return;
-    }
-    const otherParticipant = selectedConversation.otherParticipant;
-    if (!otherParticipant) {
-      toast.error('Recipient not found');
-      return;
-    }
-    const targetUserId = otherParticipant.userId?._id || otherParticipant._id;
-    const targetUserName = otherParticipant.name || 'User';
-    const targetUserAvatar = otherParticipant.userId?.avatar || otherParticipant.avatar || null;
-
-    if (!targetUserId) {
-      toast.error('Recipient ID not found');
-      return;
-    }
-    if (!onlineUsers[targetUserId]) {
-      toast.error('User is not online');
-      return;
-    }
-
-    const callId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
-    setCallState({
-      isOpen: true,
-      callType,
-      callId,
-      targetUserId,
-      targetUserName,
-      targetUserAvatar,
-      isCaller: true,
-      callStatus: 'ringing',
-      isVideoEnabled: true,
-      isAudioEnabled: true,
-      callStartTime: null
-    });
-
-    try {
-      const pc = initPeerConnection();
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: callType === 'video'
-      });
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-        localVideoRef.current.play().catch(console.error);
-      }
-      stream.getTracks().forEach(track => pc.addTrack(track, stream));
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({
-          type: 'call_offer',
-          callId,
-          targetUserId,
-          offer,
-          callType,
-          callerName: currentUser?.name || 'User',
-          callerAvatar: currentUser?.avatar?.url || null
-        }));
-        console.log('📤 Call offer sent');
-      }
-      toast.info(`Calling ${targetUserName}...`);
-    } catch (error) {
-      console.error('Error starting call:', error);
-      toast.error('Could not start call');
-      setCallState(prev => ({ ...prev, isOpen: false, callStatus: 'idle' }));
-      if (peerConnectionRef.current) {
-        peerConnectionRef.current.close();
-        peerConnectionRef.current = null;
-      }
-    }
-  }, [selectedConversation, onlineUsers, initPeerConnection, ws, currentUser]);
-
-  const handleCallOffer = useCallback(async (data) => {
-    const { callId, offer, callerId, callType, callerName, callerAvatar } = data;
-    console.log('📞 Incoming call offer from:', callerId, 'callType:', callType);
-    
-    if (callState.isOpen) {
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'call_end', callId, targetUserId: callerId }));
-      }
-      toast.warning('Already in a call');
-      return;
-    }
-
-    callOfferRef.current = offer;
-
-    setCallState({
-      isOpen: true,
-      callType: callType || 'audio',
-      callId: callId,
-      targetUserId: callerId,
-      targetUserName: callerName || 'User',
-      targetUserAvatar: callerAvatar || null,
-      isCaller: false,
-      callStatus: 'ringing',
-      isVideoEnabled: true,
-      isAudioEnabled: true,
-      callStartTime: null
-    });
-
-    toast.info(
-      <div>
-        <p className="font-semibold">Incoming {callType || 'audio'} call from {callerName || 'User'}</p>
-        <div className="flex gap-2 mt-2">
-          <button 
-            className="bg-green-500 text-white px-4 py-1 rounded text-sm hover:bg-green-600" 
-            onClick={() => {
-              toast.dismiss();
-              acceptCall();
-            }}
-          >
-            Accept
-          </button>
-          <button 
-            className="bg-red-500 text-white px-4 py-1 rounded text-sm hover:bg-red-600" 
-            onClick={() => {
-              toast.dismiss();
-              rejectCall();
-            }}
-          >
-            Reject
-          </button>
-        </div>
-      </div>,
-      { autoClose: false, closeOnClick: false }
-    );
-  }, [callState.isOpen, ws]);
-
-  const acceptCall = useCallback(async () => {
-    if (!callState.isOpen || callState.isCaller || callState.callStatus !== 'ringing') {
-      console.log('Cannot accept call: invalid state', callState);
-      return;
-    }
-
-    console.log('📞 Accepting call...');
-    try {
-      const pc = initPeerConnection();
-      if (!pc) {
-        console.error('Failed to create peer connection');
-        toast.error('Failed to create peer connection');
-        return;
-      }
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: callState.callType === 'video'
-      });
-      
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-        await localVideoRef.current.play().catch(console.error);
-      }
-      
-      stream.getTracks().forEach(track => pc.addTrack(track, stream));
-      
-      if (!callOfferRef.current) {
-        console.error('No call offer available');
-        toast.error('No call offer available');
-        return;
-      }
-      
-      await pc.setRemoteDescription(new RTCSessionDescription(callOfferRef.current));
-      console.log('✅ Remote description set');
-      
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      console.log('✅ Local description set');
-      
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({
-          type: 'call_answer',
-          callId: callState.callId,
-          answer: answer,
-          targetUserId: callState.targetUserId
-        }));
-        console.log('📤 Call answer sent');
-      } else {
-        console.error('WebSocket is not open');
-        toast.error('WebSocket connection lost');
-        return;
-      }
-      
-      setCallState(prev => ({ ...prev, callStatus: 'connecting' }));
-      toast.info('Connecting...');
-    } catch (error) {
-      console.error('Error accepting call:', error);
-      toast.error('Could not accept call: ' + error.message);
-      setCallState(prev => ({ ...prev, isOpen: false, callStatus: 'idle' }));
-      if (peerConnectionRef.current) {
-        peerConnectionRef.current.close();
-        peerConnectionRef.current = null;
-      }
-    }
-  }, [callState, initPeerConnection, ws]);
-
-  const rejectCall = useCallback(() => {
-    if (callState.isOpen && ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({
-        type: 'call_end',
-        callId: callState.callId,
-        targetUserId: callState.targetUserId
-      }));
-    }
-    setCallState({
-      isOpen: false,
-      callType: null,
-      callId: null,
-      targetUserId: null,
-      targetUserName: '',
-      targetUserAvatar: null,
-      isCaller: false,
-      callStatus: 'idle',
-      isVideoEnabled: true,
-      isAudioEnabled: true,
-      callStartTime: null
-    });
-    toast.info('Call rejected');
-  }, [callState, ws]);
-
-  const handleCallAnswer = useCallback(async (data) => {
-    const { callId, answer } = data;
-    console.log('📞 Call answer received for:', callId);
-    
-    if (callState.callId !== callId) {
-      console.log('Call ID mismatch:', callState.callId, 'vs', callId);
-      return;
-    }
-    
-    try {
-      const pc = peerConnectionRef.current;
-      if (!pc) {
-        console.error('No peer connection available');
-        return;
-      }
-      
-      await pc.setRemoteDescription(new RTCSessionDescription(answer));
-      console.log('✅ Remote description set for answer');
-      
-      setCallState(prev => ({ 
-        ...prev, 
-        callStatus: 'connected',
-        callStartTime: Date.now()
-      }));
-      toast.success('Call connected!');
-    } catch (error) {
-      console.error('Error handling call answer:', error);
-      toast.error('Could not connect call');
-      endCall();
-    }
-  }, [callState.callId]);
-
-  const handleIceCandidate = useCallback(async (data) => {
-    const { callId, candidate } = data;
-    
-    if (callState.callId !== callId) {
-      console.log('ICE candidate call ID mismatch:', callState.callId, 'vs', callId);
-      return;
-    }
-    
-    try {
-      const pc = peerConnectionRef.current;
-      if (!pc) {
-        console.error('No peer connection for ICE candidate');
-        return;
-      }
-      
-      await pc.addIceCandidate(new RTCIceCandidate(candidate));
-      console.log('🧊 ICE candidate added');
-    } catch (error) {
-      console.error('Error adding ICE candidate:', error);
-    }
-  }, [callState.callId]);
-
-  const handleCallEnd = useCallback((data) => {
-    const { callId } = data;
-    if (callState.callId !== callId) return;
-    toast.info('Call ended');
-    endCall();
-  }, [callState.callId]);
-
-  // Send call message
-  const sendCallMessage = useCallback(async (callStatus, callDuration = 0) => {
-    if (!selectedConversation) return;
-    
-    const otherParticipant = selectedConversation.otherParticipant;
-    if (!otherParticipant) return;
-    
-    let receiverId = otherParticipant.userId?._id || otherParticipant.userId || otherParticipant._id;
-    if (!receiverId) return;
-    
-    let receiverType = otherParticipant.userType || 'User';
-    const validTypes = ['User', 'Farmer', 'Admin'];
-    if (!validTypes.includes(receiverType)) receiverType = 'User';
-    const receiverName = otherParticipant.name || otherParticipant.userId?.name || 'User';
-    
-    try {
-      await axios.post(
-        `${API_BASE_URL}/api/messages/call/message`,
-        {
-          receiverId,
-          receiverType,
-          receiverName,
-          callType: callState.callType || 'audio',
-          callStatus: callStatus,
-          callDuration: callDuration
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      
-      if (selectedConversation) {
-        fetchMessages(selectedConversation._id);
-      }
-    } catch (error) {
-      console.error('Error sending call message:', error);
-    }
-  }, [selectedConversation, callState.callType, API_BASE_URL, token, fetchMessages]);
-
-  // End call
-  const endCall = useCallback(async () => {
-    let duration = 0;
-    let callStatus = 'ended';
-    
-    console.log('📞 Ending call...');
-    
-    if (localVideoRef.current && localVideoRef.current.srcObject) {
-      const tracks = localVideoRef.current.srcObject.getTracks();
-      tracks.forEach(track => track.stop());
-      localVideoRef.current.srcObject = null;
-    }
-    
-    if (remoteVideoRef.current && remoteVideoRef.current.srcObject) {
-      remoteVideoRef.current.srcObject = null;
-    }
-    
-    if (peerConnectionRef.current) {
-      peerConnectionRef.current.close();
-      peerConnectionRef.current = null;
-      console.log('🔒 Peer connection closed');
-    }
-    
-    if (callState.callStatus === 'ringing' && callState.isCaller) {
-      callStatus = 'missed';
-    } else if (callState.callStatus === 'ringing' && !callState.isCaller) {
-      callStatus = 'missed';
-    } else if (callState.callStatus === 'connected') {
-      if (callState.callStartTime) {
-        duration = Math.floor((Date.now() - callState.callStartTime) / 1000);
-      }
-      callStatus = 'answered';
-    } else if (callState.callStatus === 'connecting') {
-      callStatus = 'missed';
-    }
-    
-    if (callState.isOpen) {
-      await sendCallMessage(callStatus, duration);
-    }
-    
-    if (callState.isOpen && ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({
-        type: 'call_end',
-        callId: callState.callId,
-        targetUserId: callState.targetUserId
-      }));
-      console.log('📤 Call end notification sent');
-    }
-    
-    setCallState({
-      isOpen: false,
-      callType: null,
-      callId: null,
-      targetUserId: null,
-      targetUserName: '',
-      targetUserAvatar: null,
-      isCaller: false,
-      callStatus: 'idle',
-      isVideoEnabled: true,
-      isAudioEnabled: true,
-      callStartTime: null
-    });
-  }, [callState, ws, sendCallMessage]);
-
-  // Toggle video
-  const toggleVideo = useCallback(() => {
-    if (localVideoRef.current && localVideoRef.current.srcObject) {
-      const videoTrack = localVideoRef.current.srcObject.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.enabled = !videoTrack.enabled;
-        setCallState(prev => ({ ...prev, isVideoEnabled: videoTrack.enabled }));
-      }
-    }
-  }, []);
-
-  // Toggle audio
-  const toggleAudio = useCallback(() => {
-    if (localVideoRef.current && localVideoRef.current.srcObject) {
-      const audioTrack = localVideoRef.current.srcObject.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled;
-        setCallState(prev => ({ ...prev, isAudioEnabled: audioTrack.enabled }));
-      }
-    }
-  }, []);
 
   // Mark as read
   const markAsRead = async (conversationId) => {
@@ -1039,7 +555,7 @@ const UserMessage = () => {
     }
   };
 
-  // ===== REPORT MESSAGE FUNCTION (Updated to use /api/admin) =====
+  // ===== REPORT MESSAGE FUNCTION =====
   const reportMessage = async () => {
     console.log('📝 reportMessage called');
     console.log('reportReason:', reportReason);
@@ -1067,7 +583,6 @@ const UserMessage = () => {
     try {
       console.log('📤 Sending report request to:', `${API_BASE_URL}/api/admin/messages/${selectedMessage._id}/report`);
       
-      // Use the correct endpoint - mounted at /api/admin
       const response = await axios.post(
         `${API_BASE_URL}/api/admin/messages/${selectedMessage._id}/report`,
         { 
@@ -1295,12 +810,6 @@ const UserMessage = () => {
     initializeMessages();
   }, [API_BASE_URL, token, userId]);
 
-  useEffect(() => {
-    return () => {
-      if (callState.isOpen) endCall();
-    };
-  }, [callState.isOpen, endCall]);
-
   return (
     <div className="full-bleed w-full min-h-screen bg-gray-50 flex flex-col">
       <UserHeader />
@@ -1427,16 +936,6 @@ const UserMessage = () => {
                   </div>
                 </div>
                 <div className="flex items-center gap-0.5 flex-shrink-0">
-                  {!selectedConversation.isBlocked && (
-                    <>
-                      <button className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-full text-sm" onClick={() => startCall('audio')}>
-                        <FiPhone size={16} />
-                      </button>
-                      <button className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-full text-sm" onClick={() => startCall('video')}>
-                        <FiVideo size={16} />
-                      </button>
-                    </>
-                  )}
                   <button 
                     className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-full text-sm"
                     onClick={() => setShowBlockConfirm(true)}
@@ -1502,21 +1001,6 @@ const UserMessage = () => {
                                     )}
                                   </div>
                                 ))}
-                              </div>
-                            )}
-                            {msg.callType && msg.callType !== 'none' && (
-                              <div className="flex items-center gap-2 text-sm mt-1">
-                                {msg.callType === 'audio' ? (
-                                  <FiPhone className={msg.callStatus === 'answered' ? 'text-green-500' : 'text-red-500'} size={14} />
-                                ) : (
-                                  <FiVideo className={msg.callStatus === 'answered' ? 'text-green-500' : 'text-red-500'} size={14} />
-                                )}
-                                <span className={msg.callStatus === 'answered' ? 'text-green-600' : 'text-red-500'}>
-                                  {msg.callStatus === 'answered' && `${msg.callType === 'audio' ? 'Voice' : 'Video'} call • ${msg.callDuration || 0}s`}
-                                  {msg.callStatus === 'missed' && 'Missed call'}
-                                  {msg.callStatus === 'rejected' && 'Rejected call'}
-                                  {msg.callStatus === 'cancelled' && 'Cancelled call'}
-                                </span>
                               </div>
                             )}
                           </div>
@@ -1668,7 +1152,7 @@ const UserMessage = () => {
         </div>
       )}
 
-      {/* Report Modal - Updated with correct endpoint */}
+      {/* Report Modal */}
       {showReportModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => {
           console.log('❌ Closing report modal (clicked outside)');
@@ -1728,29 +1212,6 @@ const UserMessage = () => {
           </div>
         </div>
       )}
-
-      {/* Call Component */}
-      <Call
-        isOpen={callState.isOpen}
-        onClose={() => {
-          if (callState.isOpen) endCall();
-        }}
-        callType={callState.callType}
-        targetUserName={callState.targetUserName}
-        targetUserAvatar={callState.targetUserAvatar}
-        callStatus={callState.callStatus}
-        isCaller={callState.isCaller}
-        onEndCall={endCall}
-        onAcceptCall={acceptCall}
-        onRejectCall={rejectCall}
-        onToggleVideo={toggleVideo}
-        onToggleAudio={toggleAudio}
-        isVideoEnabled={callState.isVideoEnabled}
-        isAudioEnabled={callState.isAudioEnabled}
-        localVideoRef={localVideoRef}
-        remoteVideoRef={remoteVideoRef}
-        getInitials={getInitials}
-      />
     </div>
   );
 };
