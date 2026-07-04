@@ -1,3 +1,5 @@
+// Mapa-Milihan/backend/utils/Groq.js
+
 const Groq = require('groq-sdk');
 
 // Initialize Groq client
@@ -16,49 +18,72 @@ try {
   console.error('❌ Failed to initialize Groq client:', error.message);
 }
 
-// System prompt for the chatbot
+// System prompt for the farmer chatbot
 const SYSTEM_PROMPT = `You are MAPA-Milihan AI, an agricultural intelligence assistant for farmers and agricultural enthusiasts in the Philippines.
 
-Your expertise includes:
-- Crop cultivation and management (rice, corn, vegetables, fruits, rubber trees, etc.)
-- Soil science and fertilization
-- Pest and disease management
-- Irrigation and water management
-- Agricultural best practices
-- Sustainable farming techniques
-- Post-harvest handling
-- Agricultural economics
-- Weather impact on crops
-- Organic farming practices
+## Your Expertise Areas:
 
-Guidelines:
+### 1. Agriculture & Farming
+- **Crops**: Rice, corn, vegetables, fruits, grains, legumes, root crops
+- **Livestock**: Cattle, pigs, goats, poultry, sheep, carabao
+- **Soil Science**: Soil types, fertility, pH, organic matter, composting
+- **Pest Management**: Common pests, natural predators, organic pesticides, integrated pest management
+- **Diseases**: Plant diseases, livestock diseases, prevention, treatment
+- **Irrigation**: Methods, scheduling, water conservation, drip irrigation
+- **Fertilization**: Organic fertilizers, synthetic fertilizers, application rates, timing
+- **Harvesting**: Timing, methods, post-harvest handling, storage
+- **Planting Guide**: Seasonal planting, crop rotation, intercropping, companion planting
+
+### 2. Marketplace & Products
+- **Categories**: Fruits, Vegetables, Grains, Livestock, Others
+- **Units**: Per Kilo (KG), Per Tray (Tray), Per Sack (Sack), Per Piece (PC), Per Liter (L)
+- **Pricing**: Market trends, fair pricing, seasonal price fluctuations
+- **Quality Standards**: Grading, freshness indicators, packaging
+- **Storage**: Proper storage methods for different products
+- **Transportation**: Best practices for transporting agricultural products
+
+### 3. Community Forums
+- **Discussion Topics**: Farming techniques, pest control, market trends, weather impact
+- **Sharing Knowledge**: Best practices, success stories, lessons learned
+- **Q&A**: Answering farming-related questions from the community
+- **Event Posting**: Announcing farming events, workshops, seminars
+
+### 4. Messaging Features
+- **Farmer-to-Farmer**: Connect with other farmers, share advice, collaborate
+- **Farmer-to-User**: Connect with buyers, discuss products, negotiate prices
+- **User-to-User**: Community building, sharing experiences
+- **Reporting**: How to report inappropriate messages, posts, or comments
+
+### 5. Agricultural Mapping
+- **Farm Mapping**: Marking farm boundaries, crop areas, livestock zones
+- **Location Sharing**: Finding nearby farms, markets, agricultural suppliers
+- **Weather Mapping**: Understanding weather patterns affecting agriculture
+- **Soil Mapping**: Soil type identification for different areas
+
+## Guidelines:
 1. Provide practical, actionable advice tailored to the Philippine agricultural context
 2. Use simple, clear language that farmers can easily understand
 3. Always be helpful, encouraging, and professional
 4. If you don't know something, be honest about it
-5. Provide specific recommendations when possible (e.g., fertilizer amounts, timing, etc.)
+5. Provide specific recommendations when possible (e.g., fertilizer amounts, timing, planting dates)
 6. Consider the local climate and seasons in the Philippines
 7. Promote sustainable and environmentally friendly practices
+8. Support community building and knowledge sharing
+9. Provide market insights and pricing guidance when asked
 
-Remember: You are helping Filipino farmers and agricultural stakeholders make better decisions for their farms and livelihoods.`;
+## Response Format:
+- Be concise but thorough
+- Use bullet points for lists
+- Provide step-by-step guidance when appropriate
+- Include practical examples
+- Reference Philippine agricultural practices
+
+Remember: You are helping Filipino farmers and agricultural stakeholders make better decisions for their farms, products, and livelihoods.`;
 
 // Chat session memory (in production, use Redis or database)
 const sessionMemory = new Map();
 
 // Available Groq models (as of 2026)
-// Source: https://console.groq.com/docs/models
-const AVAILABLE_MODELS = [
-  'llama-3.3-70b-versatile',    // Latest Llama 3.3 70B
-  'llama-3.1-70b-versatile',    // Llama 3.1 70B
-  'llama-3.1-8b-instant',       // Fast Llama 3.1 8B
-  'llama-3.2-11b-vision-preview', // Vision model
-  'llama-3.2-90b-vision-preview', // Vision model
-  'gemma2-9b-it',               // Google Gemma 2
-  'mixtral-8x7b-32768',         // DEPRECATED - Do not use
-  'llama3-70b-8192',            // DEPRECATED - Do not use
-];
-
-// Try models in order of preference
 const MODEL_PREFERENCE = [
   'llama-3.3-70b-versatile',   // Best quality
   'llama-3.1-70b-versatile',   // Good quality
@@ -108,6 +133,37 @@ const testModels = async () => {
   }
 })();
 
+// ── Topic Detection ─────────────────────────────────────────────────────
+const detectTopic = (message) => {
+  const lower = message.toLowerCase();
+  
+  const topics = {
+    planting: ['plant', 'sow', 'seed', 'germinate', 'transplant', 'seedling', 'propagate'],
+    harvesting: ['harvest', 'pick', 'collect', 'gather', 'yield'],
+    pests: ['pest', 'insect', 'bug', 'aphid', 'worm', 'caterpillar', 'locust', 'mite', 'spider mite'],
+    diseases: ['disease', 'rot', 'blight', 'mildew', 'rust', 'virus', 'fungus', 'bacterial'],
+    fertilizer: ['fertilizer', 'compost', 'manure', 'nutrient', 'soil', 'organic', 'chemical', 'urea', 'npk'],
+    irrigation: ['irrigate', 'water', 'rain', 'drip', 'sprinkler', 'flood', 'moisture'],
+    livestock: ['livestock', 'cattle', 'pig', 'goat', 'chicken', 'poultry', 'carabao', 'sheep', 'animal'],
+    market: ['market', 'price', 'sell', 'buy', 'cost', 'profit', 'demand', 'supply', 'trading'],
+    products: ['fruits', 'vegetables', 'grains', 'rice', 'corn', 'mango', 'banana', 'tomato', 'eggplant'],
+    forum: ['forum', 'discuss', 'share', 'post', 'comment', 'community', 'topic', 'question'],
+    messaging: ['message', 'chat', 'conversation', 'communicate', 'talk', 'notify', 'alert'],
+    mapping: ['map', 'location', 'area', 'boundary', 'plot', 'field', 'zone', 'coordinate', 'gps'],
+    weather: ['weather', 'climate', 'rainfall', 'temperature', 'typhoon', 'monsoon', 'dry', 'wet', 'season'],
+    soil: ['soil', 'clay', 'sandy', 'loam', 'ph', 'organic matter', 'compost', 'earthworm'],
+  };
+  
+  const detected = [];
+  for (const [topic, keywords] of Object.entries(topics)) {
+    if (keywords.some(kw => lower.includes(kw))) {
+      detected.push(topic);
+    }
+  }
+  return detected;
+};
+
+// ── Get Response ──────────────────────────────────────────────────────
 const getChatResponse = async (message, sessionId, userContext = null) => {
   try {
     // Check if Groq is initialized
@@ -124,6 +180,10 @@ const getChatResponse = async (message, sessionId, userContext = null) => {
       console.log(`✅ Using model: ${activeModel}`);
     }
 
+    // Detect topics
+    const detectedTopics = detectTopic(message);
+    console.log(`🔍 Detected topics: ${detectedTopics.join(', ')}`);
+
     // Get or create session history
     if (!sessionMemory.has(sessionId)) {
       sessionMemory.set(sessionId, []);
@@ -137,11 +197,15 @@ const getChatResponse = async (message, sessionId, userContext = null) => {
     ];
     
     // Add user context if available
-    if (userContext && userContext.name) {
-      messages.push({
-        role: 'system',
-        content: `The user's name is ${userContext.name}. ${userContext.location ? `They are from ${userContext.location}.` : ''}`
-      });
+    if (userContext) {
+      let contextMsg = 'User context: ';
+      if (userContext.name) contextMsg += `Name: ${userContext.name}. `;
+      if (userContext.location) contextMsg += `Location: ${userContext.location}. `;
+      if (userContext.role) contextMsg += `Role: ${userContext.role}. `;
+      if (userContext.farmSize) contextMsg += `Farm size: ${userContext.farmSize}. `;
+      if (userContext.crops) contextMsg += `Crops grown: ${userContext.crops}. `;
+      if (detectedTopics.length > 0) contextMsg += `This question is about: ${detectedTopics.join(', ')}.`;
+      messages.push({ role: 'system', content: contextMsg });
     }
     
     // Add conversation history (last 10 messages to keep context manageable)
@@ -151,7 +215,8 @@ const getChatResponse = async (message, sessionId, userContext = null) => {
     // Add current message
     messages.push({ role: 'user', content: message });
     
-    console.log(`📤 Sending message to Groq for session ${sessionId} using ${activeModel}:`, message.substring(0, 50) + '...');
+    console.log(`📤 Sending message to Groq for session ${sessionId} using ${activeModel}`);
+    console.log(`📝 Topics detected: ${detectedTopics.join(', ')}`);
     
     // Get response from Groq
     const completion = await groqClient.chat.completions.create({
@@ -164,7 +229,7 @@ const getChatResponse = async (message, sessionId, userContext = null) => {
     
     const response = completion.choices[0]?.message?.content || 'I apologize, but I could not generate a response. Please try again.';
     
-    console.log(`📥 Received response from Groq for session ${sessionId}:`, response.substring(0, 50) + '...');
+    console.log(`📥 Received response from Groq for session ${sessionId}`);
     
     // Store in history
     history.push(
@@ -217,10 +282,17 @@ const getModelInfo = () => {
   };
 };
 
+// Get session memory size (for monitoring)
+const getSessionCount = () => {
+  return sessionMemory.size;
+};
+
 module.exports = {
   getChatResponse,
   clearSession,
   isGroqInitialized,
   getModelInfo,
+  getSessionCount,
+  detectTopic,
   SYSTEM_PROMPT,
 };

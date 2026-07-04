@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+// Correct import path for your file location
 const { getChatResponse, clearSession, isGroqInitialized, getModelInfo } = require('../config/groq');
 
 // Health check endpoint
@@ -100,6 +101,25 @@ router.post('/chat/clear', (req, res) => {
     });
   } catch (error) {
     console.error('❌ Clear session error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error'
+    });
+  }
+});
+
+// Get session info endpoint (optional - for monitoring)
+router.get('/sessions', (req, res) => {
+  try {
+    const { getSessionCount } = require('../config/groq');
+    const count = getSessionCount ? getSessionCount() : 0;
+    res.json({
+      success: true,
+      activeSessions: count,
+      message: `There are ${count} active chat sessions`
+    });
+  } catch (error) {
+    console.error('❌ Session info error:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Internal server error'
