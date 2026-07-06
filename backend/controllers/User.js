@@ -58,7 +58,8 @@ exports.registerUser = async (req, res) => {
           email: user.email,
           isVerified: user.isVerified,
           authProvider: user.authProvider,
-          role: user.role
+          role: user.role,
+          walletBalance: user.walletBalance
         }
       });
 
@@ -67,7 +68,7 @@ exports.registerUser = async (req, res) => {
     else if (authProvider === 'local') {
       console.log('👤 Creating LOCAL user in database...');
       
-      // Validate role
+      // Validate role - allow 'user', 'farmer' for registration
       const validRoles = ['user', 'farmer'];
       const userRole = validRoles.includes(role) ? role : 'user';
       console.log(`📌 User role selected: ${userRole}`);
@@ -125,7 +126,8 @@ exports.registerUser = async (req, res) => {
           email: user.email,
           isVerified: user.isVerified,
           authProvider: user.authProvider,
-          role: user.role
+          role: user.role,
+          walletBalance: user.walletBalance
         }
       });
     } else {
@@ -231,6 +233,7 @@ exports.checkEmailVerification = async (req, res) => {
       isVerified: user.isVerified,
       authProvider: user.authProvider,
       role: user.role,
+      walletBalance: user.walletBalance,
       message: user.isVerified ? 'Email is verified' : 'Email is not verified'
     });
 
@@ -303,7 +306,10 @@ exports.loginUser = async (req, res) => {
     res.status(200).json({ 
       success: true, 
       token, 
-      user: userResponse 
+      user: {
+        ...userResponse,
+        walletBalance: user.walletBalance
+      }
     });
 
   } catch (error) {
@@ -410,8 +416,8 @@ exports.firebaseGoogleAuth = async (req, res) => {
         user.authProvider = 'google';
         user.firebaseUID = uid;
         user.isVerified = true;
-        // Keep existing role if it's admin or farmer, otherwise set to user
-        if (!['admin', 'farmer'].includes(user.role)) {
+        // Keep existing role if it's admin, farmer, or rider, otherwise set to user
+        if (!['admin', 'farmer', 'rider'].includes(user.role)) {
           user.role = 'user';
         }
         await user.save({ validateBeforeSave: false });
@@ -439,7 +445,10 @@ exports.firebaseGoogleAuth = async (req, res) => {
     res.status(200).json({
       success: true,
       token,
-      user: userResponse,
+      user: {
+        ...userResponse,
+        walletBalance: user.walletBalance
+      },
       message: 'Google authentication successful'
     });
 
@@ -503,8 +512,8 @@ exports.firebaseFacebookAuth = async (req, res) => {
         user.authProvider = 'facebook';
         user.firebaseUID = uid;
         user.isVerified = true;
-        // Keep existing role if it's admin or farmer, otherwise set to user
-        if (!['admin', 'farmer'].includes(user.role)) {
+        // Keep existing role if it's admin, farmer, or rider, otherwise set to user
+        if (!['admin', 'farmer', 'rider'].includes(user.role)) {
           user.role = 'user';
         }
         await user.save({ validateBeforeSave: false });
@@ -532,7 +541,10 @@ exports.firebaseFacebookAuth = async (req, res) => {
     res.status(200).json({
       success: true,
       token,
-      user: userResponse,
+      user: {
+        ...userResponse,
+        walletBalance: user.walletBalance
+      },
       message: 'Facebook authentication successful'
     });
 
@@ -655,7 +667,14 @@ exports.resetPassword = async (req, res) => {
     }).catch(err => console.warn('Could not send password change confirmation:', err.message));
 
     const token = user.getJwtToken();
-    res.status(200).json({ success: true, token, user });
+    res.status(200).json({ 
+      success: true, 
+      token, 
+      user: {
+        ...user.toObject(),
+        walletBalance: user.walletBalance
+      } 
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -677,6 +696,7 @@ exports.getUserProfile = async (req, res) => {
         address: user.address,
         avatar: user.avatar,
         role: user.role,
+        walletBalance: user.walletBalance,
         isVerified: user.isVerified,
         authProvider: user.authProvider,
         createdAt: user.createdAt
@@ -803,7 +823,10 @@ exports.updateProfile = async (req, res) => {
     console.log('✅ Profile updated successfully');
     res.status(200).json({
       success: true,
-      user: updatedUser,
+      user: {
+        ...updatedUser.toObject(),
+        walletBalance: updatedUser.walletBalance
+      },
       message: 'Profile updated successfully'
     });
 
@@ -893,7 +916,7 @@ exports.getUserAvatar = async (req, res) => {
       });
     }
 
-    const user = await User.findById(userId).select('avatar name');
+    const user = await User.findById(userId).select('avatar name walletBalance');
     
     if (!user) {
       return res.status(404).json({
@@ -911,7 +934,8 @@ exports.getUserAvatar = async (req, res) => {
     res.status(200).json({
       success: true,
       avatarUrl: avatarUrl,
-      name: user.name
+      name: user.name,
+      walletBalance: user.walletBalance
     });
   } catch (error) {
     console.error('❌ GET AVATAR ERROR:', error);
@@ -919,6 +943,262 @@ exports.getUserAvatar = async (req, res) => {
       success: false,
       message: 'Error fetching avatar',
       error: error.message
+    });
+  }
+};
+
+// ========== GET WALLET BALANCE ==========
+exports.getWalletBalance = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('walletBalance name email');
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      walletBalance: user.walletBalance,
+      user: {
+        name: user.name,
+        email: user.email
+      }
+    });
+  } catch (error) {
+    console.error('❌ GET WALLET BALANCE ERROR:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching wallet balance',
+      error: error.message
+    });
+  }
+};
+
+// ========== ADD WALLET BALANCE ==========
+exports.addWalletBalance = async (req, res) => {
+  try {
+    const { amount } = req.body;
+    
+    if (!amount || amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid positive amount'
+      });
+    }
+
+    const user = await User.findById(req.user.id);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const updatedUser = await user.addWalletBalance(amount);
+    
+    res.status(200).json({
+      success: true,
+      message: `Added ₱${amount} to wallet successfully`,
+      walletBalance: updatedUser.walletBalance
+    });
+  } catch (error) {
+    console.error('❌ ADD WALLET BALANCE ERROR:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to add wallet balance'
+    });
+  }
+};
+
+// ========== DEDUCT WALLET BALANCE ==========
+exports.deductWalletBalance = async (req, res) => {
+  try {
+    const { amount } = req.body;
+    
+    if (!amount || amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid positive amount'
+      });
+    }
+
+    const user = await User.findById(req.user.id);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Check if user has sufficient balance
+    if (!user.hasSufficientBalance(amount)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Insufficient wallet balance',
+        currentBalance: user.walletBalance
+      });
+    }
+
+    const updatedUser = await user.deductWalletBalance(amount);
+    
+    res.status(200).json({
+      success: true,
+      message: `Deducted ₱${amount} from wallet successfully`,
+      walletBalance: updatedUser.walletBalance
+    });
+  } catch (error) {
+    console.error('❌ DEDUCT WALLET BALANCE ERROR:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to deduct wallet balance'
+    });
+  }
+};
+
+// ========== CHECK WALLET BALANCE SUFFICIENCY ==========
+exports.checkWalletBalance = async (req, res) => {
+  try {
+    const { amount } = req.body;
+    
+    if (!amount || amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid positive amount'
+      });
+    }
+
+    const user = await User.findById(req.user.id).select('walletBalance name email');
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const hasSufficient = user.hasSufficientBalance(amount);
+    
+    res.status(200).json({
+      success: true,
+      hasSufficientBalance: hasSufficient,
+      currentBalance: user.walletBalance,
+      requiredAmount: amount,
+      shortfall: hasSufficient ? 0 : amount - user.walletBalance
+    });
+  } catch (error) {
+    console.error('❌ CHECK WALLET BALANCE ERROR:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error checking wallet balance',
+      error: error.message
+    });
+  }
+};
+
+// ========== UPDATE USER ROLE (Admin only) ==========
+exports.updateUserRole = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { role } = req.body;
+
+    // Validate role
+    const validRoles = ['user', 'admin', 'farmer', 'rider'];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid role. Allowed roles: ${validRoles.join(', ')}`
+      });
+    }
+
+    // Check if user exists
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Update role
+    const updatedUser = await user.changeRole(role);
+    
+    console.log(`✅ User ${user.email} role updated to: ${role}`);
+    
+    res.status(200).json({
+      success: true,
+      message: `User role updated to ${role} successfully`,
+      user: {
+        id: updatedUser._id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        role: updatedUser.role,
+        walletBalance: updatedUser.walletBalance
+      }
+    });
+  } catch (error) {
+    console.error('❌ UPDATE USER ROLE ERROR:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to update user role'
+    });
+  }
+};
+
+// ========== GET ALL USERS (Admin only) ==========
+exports.getAllUsers = async (req, res) => {
+  try {
+    const users = await User.find()
+      .select('-password -emailVerificationToken -resetPasswordToken')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      count: users.length,
+      users
+    });
+  } catch (error) {
+    console.error('❌ GET ALL USERS ERROR:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch users'
+    });
+  }
+};
+
+// ========== GET USERS BY ROLE ==========
+exports.getUsersByRole = async (req, res) => {
+  try {
+    const { role } = req.params;
+    
+    // Validate role
+    const validRoles = ['user', 'admin', 'farmer', 'rider'];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid role. Allowed roles: ${validRoles.join(', ')}`
+      });
+    }
+
+    const users = await User.find({ role })
+      .select('-password -emailVerificationToken -resetPasswordToken')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      count: users.length,
+      role: role,
+      users
+    });
+  } catch (error) {
+    console.error('❌ GET USERS BY ROLE ERROR:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch users'
     });
   }
 };

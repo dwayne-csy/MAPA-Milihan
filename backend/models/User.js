@@ -66,9 +66,14 @@ const userSchema = new mongoose.Schema({
             }
         }
     },
+    walletBalance: {
+        type: Number,
+        default: 0,
+        min: [0, 'Wallet balance cannot be negative']
+    },
     role: {
         type: String,
-        enum: ['user', 'admin', 'farmer'],
+        enum: ['user', 'admin', 'farmer', 'rider'],
         default: 'user'
     },
     isActive: {
@@ -143,6 +148,58 @@ userSchema.methods.getEmailVerificationToken = function () {
     this.emailVerificationToken = crypto.createHash('sha256').update(verifyToken).digest('hex');
     this.emailVerificationExpire = Date.now() + 30 * 60 * 1000;
     return verifyToken;
+};
+
+// ========== NEW METHODS FOR WALLET AND ROLE ==========
+
+// Wallet management methods
+userSchema.methods.addWalletBalance = async function(amount) {
+    if (amount <= 0) {
+        throw new Error('Amount must be positive');
+    }
+    this.walletBalance += amount;
+    return this.save();
+};
+
+userSchema.methods.deductWalletBalance = async function(amount) {
+    if (amount <= 0) {
+        throw new Error('Amount must be positive');
+    }
+    if (this.walletBalance < amount) {
+        throw new Error('Insufficient wallet balance');
+    }
+    this.walletBalance -= amount;
+    return this.save();
+};
+
+userSchema.methods.hasSufficientBalance = function(amount) {
+    return this.walletBalance >= amount;
+};
+
+// Role checking methods
+userSchema.methods.isFarmer = function() {
+    return this.role === 'farmer';
+};
+
+userSchema.methods.isRider = function() {
+    return this.role === 'rider';
+};
+
+userSchema.methods.isAdmin = function() {
+    return this.role === 'admin';
+};
+
+userSchema.methods.isUser = function() {
+    return this.role === 'user';
+};
+
+userSchema.methods.changeRole = async function(newRole) {
+    const allowedRoles = ['user', 'admin', 'farmer', 'rider'];
+    if (!allowedRoles.includes(newRole)) {
+        throw new Error('Invalid role');
+    }
+    this.role = newRole;
+    return this.save();
 };
 
 module.exports = mongoose.model('User', userSchema);

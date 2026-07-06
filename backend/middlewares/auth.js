@@ -54,6 +54,15 @@ exports.isFarmer = async (req, res, next) => {
     }
 };
 
+// Rider middleware
+exports.isRider = async (req, res, next) => {
+    if (req.user && req.user.role === 'rider') {
+        next();
+    } else {
+        res.status(403).json({ message: 'Access denied. Rider rights required.' });
+    }
+};
+
 // User middleware (regular user)
 exports.isUser = async (req, res, next) => {
     if (req.user && req.user.role === 'user') {

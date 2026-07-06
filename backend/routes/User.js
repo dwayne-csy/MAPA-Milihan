@@ -13,10 +13,20 @@ const {
   firebaseFacebookAuth, 
   checkEmailVerification,
   resendVerificationEmail,
-  getUserAvatar
+  getUserAvatar,
+  getWalletBalance,
+  addWalletBalance,
+  deductWalletBalance,
+  checkWalletBalance,
+  updateUserRole,
+  getAllUsers,
+  getUsersByRole
 } = require('../controllers/User');
 
-const { isAuthenticatedUser } = require('../middlewares/auth');
+const { 
+  isAuthenticatedUser, 
+  isAdmin 
+} = require('../middlewares/auth');
 
 const router = express.Router();
 
@@ -44,5 +54,16 @@ router.put('/me/update', isAuthenticatedUser, upload.single('avatar'), updatePro
 
 // ========== USER AVATAR ROUTE ==========
 router.get('/:userId/avatar', getUserAvatar);
+
+// ========== WALLET ROUTES (User, Farmer, Rider only) ==========
+router.get('/wallet/balance', isAuthenticatedUser, getWalletBalance);
+router.post('/wallet/add', isAuthenticatedUser, addWalletBalance);
+router.post('/wallet/deduct', isAuthenticatedUser, deductWalletBalance);
+router.post('/wallet/check', isAuthenticatedUser, checkWalletBalance);
+
+// ========== ADMIN ROUTES ==========
+router.put('/admin/role/:userId', isAuthenticatedUser, isAdmin, updateUserRole);
+router.get('/admin/users', isAuthenticatedUser, isAdmin, getAllUsers);
+router.get('/admin/users/role/:role', isAuthenticatedUser, isAdmin, getUsersByRole);
 
 module.exports = router;
