@@ -200,6 +200,12 @@ const ProductDetails = () => {
   };
 
   const handleAddToCart = async () => {
+    // Check if product is out of stock
+    if (product.quantity <= 0) {
+      alert('This product is out of stock!');
+      return;
+    }
+
     // Check if user is logged in
     const token = localStorage.getItem('token');
     if (!token) {
@@ -262,7 +268,14 @@ const ProductDetails = () => {
     }
   };
 
-  const handlePurchase = () => {
+  // ── FIXED: Buy Now handler ──
+  const handleBuyNow = () => {
+    // Check if product is out of stock
+    if (product.quantity <= 0) {
+      alert('This product is out of stock!');
+      return;
+    }
+
     // Check if user is logged in
     const token = localStorage.getItem('token');
     if (!token) {
@@ -271,7 +284,15 @@ const ProductDetails = () => {
       }
       return;
     }
-    alert('Purchase functionality coming soon!');
+    
+    // Navigate to checkout with product data
+    navigate('/checkout', { 
+      state: { 
+        product: product,
+        quantity: 1,
+        isSoloCheckout: true 
+      } 
+    });
   };
 
   const formatDate = (dateString) => {
@@ -362,6 +383,35 @@ const ProductDetails = () => {
   const currentMedia = product?.images?.[currentMediaIndex] || null;
   const isVideo = currentMedia ? isVideoUrl(currentMedia.url) : false;
   const mediaCount = product?.images?.length || 0;
+  
+  // Get stock status
+  const getStockStatus = (quantity) => {
+    if (quantity <= 0) return { 
+      status: 'out-of-stock', 
+      label: 'Out of Stock', 
+      color: '#c62828', 
+      bg: '#ffebee',
+      icon: '❌'
+    };
+    if (quantity <= 10) return { 
+      status: 'low-stock', 
+      label: 'Low Stock', 
+      color: '#e65100', 
+      bg: '#fff3e0',
+      icon: '⚠️'
+    };
+    return { 
+      status: 'in-stock', 
+      label: 'In Stock', 
+      color: '#2e7d32', 
+      bg: '#e8f5e9',
+      icon: '✅'
+    };
+  };
+
+  const stockStatus = getStockStatus(Number(product?.quantity) || 0);
+  const isOutOfStock = product?.quantity <= 0;
+  const isLowStock = product?.quantity > 0 && product?.quantity <= 10;
 
   // ── Loading State ──
   if (loading) {
@@ -434,7 +484,6 @@ const ProductDetails = () => {
   const locationDisplay = getLocationDisplay();
   const unitLabel = getUnitLabel(product.unit);
   const unitFullLabel = getUnitFullLabel(product.unit);
-  const stockStatus = getStockStatus(Number(product.quantity) || 0);
 
   return (
     <div className="full-bleed w-full min-h-screen bg-gray-50 flex flex-col">
@@ -827,10 +876,11 @@ const ProductDetails = () => {
           display: flex;
           align-items: center;
           gap: 8px;
-          padding: 8px 12px;
+          padding: 10px 14px;
           border-radius: 8px;
-          margin: 0 0 12px 0;
+          margin: 4px 0 16px 0;
           font-size: 0.9rem;
+          border: 1px solid transparent;
         }
 
         .pd-stock-info .status-icon {
@@ -839,6 +889,38 @@ const ProductDetails = () => {
 
         .pd-stock-info .status-text {
           font-weight: 600;
+        }
+
+        /* Out of Stock Overlay for Gallery */
+        .pd-stock-overlay {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: rgba(0, 0, 0, 0.7);
+          backdrop-filter: blur(6px);
+          z-index: 20;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .pd-stock-overlay .stock-text {
+          color: #ff6b6b;
+          font-size: 1.8rem;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+          text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .pd-stock-overlay .stock-sub {
+          color: rgba(255,255,255,0.7);
+          font-size: 0.9rem;
+          font-weight: 400;
         }
 
         .pd-info-farmer {
@@ -960,6 +1042,11 @@ const ProductDetails = () => {
           box-shadow: 0 4px 16px rgba(21, 101, 192, 0.25);
         }
 
+        .pd-action-btn.add-to-cart:disabled {
+          background: #bdbdbd;
+          box-shadow: none;
+        }
+
         .pd-action-btn.message {
           background: linear-gradient(135deg, #1565C0, #1E88E5);
           color: #fff;
@@ -970,6 +1057,11 @@ const ProductDetails = () => {
           background: linear-gradient(135deg, #2E7D32, #43A047);
           color: #fff;
           box-shadow: 0 4px 16px rgba(46, 125, 50, 0.25);
+        }
+
+        .pd-action-btn.purchase:disabled {
+          background: #bdbdbd;
+          box-shadow: none;
         }
 
         /* ── Status Badge ── */
@@ -1072,6 +1164,13 @@ const ProductDetails = () => {
           <div className="pd-content">
             {/* ── Media Gallery ── */}
             <div className="pd-gallery">
+              {isOutOfStock && (
+                <div className="pd-stock-overlay">
+                  <span className="stock-text">Out of Stock</span>
+                  <span className="stock-sub">This product is currently unavailable</span>
+                </div>
+              )}
+              
               {mediaCount > 0 ? (
                 <>
                   {isVideo ? (
@@ -1107,6 +1206,7 @@ const ProductDetails = () => {
                       src={getMediaUrl(currentMedia)}
                       alt={product.name}
                       className="pd-gallery-image"
+                      style={{ opacity: isOutOfStock ? 0.5 : 1 }}
                       onError={(e) => {
                         e.target.style.display = 'none';
                         e.target.parentElement.innerHTML = `
@@ -1198,8 +1298,8 @@ const ProductDetails = () => {
             <div className="pd-info">
               <span className="pd-info-category">{product.category}</span>
               
-              <div className="pd-status-badge available">
-                <CheckIcon size={14} /> Available
+              <div className={`pd-status-badge ${isOutOfStock ? 'unavailable' : 'available'}`}>
+                {isOutOfStock ? '❌ Unavailable' : '✅ Available'}
               </div>
 
               <h1 className="pd-info-name">{product.name}</h1>
@@ -1213,13 +1313,19 @@ const ProductDetails = () => {
                 className="pd-stock-info" 
                 style={{ 
                   backgroundColor: stockStatus.bg,
-                  color: stockStatus.color
+                  color: stockStatus.color,
+                  borderColor: stockStatus.color
                 }}
               >
                 <span className="status-icon">{stockStatus.icon}</span>
                 <span className="status-text">
                   {stockStatus.label}: {product.quantity} {unitLabel} available
                 </span>
+                {isLowStock && !isOutOfStock && (
+                  <span style={{ marginLeft: 'auto', fontSize: '0.75rem', opacity: 0.8 }}>
+                    Hurry! Only {product.quantity} left
+                  </span>
+                )}
               </div>
 
               <p className="pd-info-description">{product.description}</p>
@@ -1284,21 +1390,22 @@ const ProductDetails = () => {
                 <button
                   className="pd-action-btn add-to-cart"
                   onClick={handleAddToCart}
-                  disabled={addingToCart}
+                  disabled={addingToCart || isOutOfStock}
                 >
                   {addingToCart ? (
                     <span className="spinner-small"></span>
                   ) : (
                     <>
-                      <CartPlusIcon size={18} /> Add to Cart
+                      <CartPlusIcon size={18} /> {isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
                     </>
                   )}
                 </button>
                 <button
                   className="pd-action-btn purchase"
-                  onClick={handlePurchase}
+                  onClick={handleBuyNow}
+                  disabled={isOutOfStock}
                 >
-                  <CreditCardIcon size={18} /> Buy Now
+                  <CreditCardIcon size={18} /> {isOutOfStock ? 'Unavailable' : 'Buy Now'}
                 </button>
               </div>
             </div>

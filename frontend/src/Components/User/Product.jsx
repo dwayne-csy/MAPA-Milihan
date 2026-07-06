@@ -187,6 +187,12 @@ const Product = () => {
   const handleAddToCart = async (e, product) => {
     e.stopPropagation();
     
+    // Check if product is out of stock
+    if (product.quantity <= 0) {
+      alert('This product is out of stock!');
+      return;
+    }
+
     const token = localStorage.getItem('token');
     if (!token) {
       if (window.confirm('Please login to add items to cart. Go to login?')) {
@@ -249,6 +255,13 @@ const Product = () => {
 
   const handleBuyNow = (e, product) => {
     e.stopPropagation();
+    
+    // Check if product is out of stock
+    if (product.quantity <= 0) {
+      alert('This product is out of stock!');
+      return;
+    }
+
     const token = localStorage.getItem('token');
     if (!token) {
       if (window.confirm('Please login to purchase. Go to login?')) {
@@ -332,6 +345,13 @@ const Product = () => {
       }
       return { ...prev, [productId]: newIndex };
     });
+  };
+
+  // Get stock status
+  const getStockStatus = (quantity) => {
+    if (quantity <= 0) return { status: 'out-of-stock', label: 'Out of Stock', color: '#c62828', bg: '#ffebee' };
+    if (quantity <= 10) return { status: 'low-stock', label: 'Low Stock', color: '#e65100', bg: '#fff3e0' };
+    return { status: 'in-stock', label: 'In Stock', color: '#2e7d32', bg: '#e8f5e9' };
   };
 
   const filteredProducts = products.filter(product => {
@@ -665,6 +685,7 @@ const Product = () => {
           box-shadow: 0 2px 12px rgba(27, 94, 32, 0.06);
           transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
           cursor: pointer;
+          position: relative;
         }
 
         .prod-card:hover {
@@ -698,6 +719,76 @@ const Product = () => {
           width: 100%;
           height: 100%;
           object-fit: cover;
+        }
+
+        /* ── Stock Status Overlay ── */
+        .prod-stock-overlay {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: rgba(0, 0, 0, 0.65);
+          backdrop-filter: blur(4px);
+          z-index: 10;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .prod-stock-overlay .stock-text {
+          color: white;
+          font-size: 1.2rem;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+          text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .prod-stock-overlay .stock-sub {
+          color: rgba(255,255,255,0.7);
+          font-size: 0.75rem;
+          font-weight: 400;
+        }
+
+        .prod-stock-overlay.out-of-stock .stock-text {
+          color: #ff6b6b;
+        }
+
+        .prod-stock-overlay.low-stock .stock-text {
+          color: #ffb74d;
+        }
+
+        /* ── Stock Badge ── */
+        .prod-stock-badge {
+          position: absolute;
+          top: 12px;
+          left: 12px;
+          padding: 4px 12px;
+          border-radius: 12px;
+          font-size: 0.65rem;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          z-index: 5;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+
+        .prod-stock-badge.in-stock {
+          background: #e8f5e9;
+          color: #2e7d32;
+        }
+
+        .prod-stock-badge.low-stock {
+          background: #fff3e0;
+          color: #e65100;
+        }
+
+        .prod-stock-badge.out-of-stock {
+          background: #ffebee;
+          color: #c62828;
         }
 
         /* ── Video Thumbnail ── */
@@ -773,7 +864,7 @@ const Product = () => {
 
         .prod-card-image .category-badge {
           position: absolute;
-          top: 12px;
+          top: 52px;
           right: 12px;
           background: rgba(0, 0, 0, 0.7);
           color: #fff;
@@ -959,11 +1050,21 @@ const Product = () => {
           flex: 1;
         }
 
+        .prod-action-btn.add-to-cart:disabled {
+          background: #bdbdbd;
+          box-shadow: none;
+        }
+
         .prod-action-btn.purchase {
           background: linear-gradient(135deg, #2E7D32, #43A047);
           color: #fff;
           box-shadow: 0 4px 14px rgba(46, 125, 50, 0.25);
           flex: 1;
+        }
+
+        .prod-action-btn.purchase:disabled {
+          background: #bdbdbd;
+          box-shadow: none;
         }
 
         /* ── Stats Bar ── */
@@ -1230,6 +1331,9 @@ const Product = () => {
                 const currentMedia = product.images && product.images.length > 0 ? product.images[currentIndex] : null;
                 const isVideo = currentMedia ? isVideoUrl(currentMedia.url) : false;
                 const isAdding = addingToCart === product._id;
+                const stockStatus = getStockStatus(product.quantity);
+                const isOutOfStock = product.quantity <= 0;
+                const isLowStock = product.quantity > 0 && product.quantity <= 10;
                 
                 return (
                   <div 
@@ -1272,10 +1376,26 @@ const Product = () => {
                         <div className="prod-no-image">No Media</div>
                       )}
                       
+                      {/* Stock Badge */}
+                      {isOutOfStock && (
+                        <span className="prod-stock-badge out-of-stock">Out of Stock</span>
+                      )}
+                      {isLowStock && (
+                        <span className="prod-stock-badge low-stock">Low Stock</span>
+                      )}
+                      
+                      {/* Stock Overlay for Out of Stock */}
+                      {isOutOfStock && (
+                        <div className="prod-stock-overlay out-of-stock">
+                          <span className="stock-text">Out of Stock</span>
+                          <span className="stock-sub">This product is currently unavailable</span>
+                        </div>
+                      )}
+                      
                       <span className="category-badge">{product.category}</span>
                       
-                      {/* Navigation Arrows - only show if multiple images */}
-                      {mediaCount > 1 && (
+                      {/* Navigation Arrows - only show if multiple images and not out of stock */}
+                      {mediaCount > 1 && !isOutOfStock && (
                         <>
                           <button
                             className="prod-image-nav prev"
@@ -1308,13 +1428,13 @@ const Product = () => {
                         </>
                       )}
                       
-                      {mediaCount > 1 && (
+                      {mediaCount > 1 && !isOutOfStock && (
                         <span className="prod-media-count">
                           {currentIndex + 1} / {mediaCount}
                         </span>
                       )}
                       
-                      {currentMedia && isVideo && (
+                      {currentMedia && isVideo && !isOutOfStock && (
                         <span className="prod-media-type">
                           <VideoIcon size={12} /> Video
                         </span>
@@ -1368,21 +1488,22 @@ const Product = () => {
                         <button
                           className="prod-action-btn add-to-cart"
                           onClick={(e) => handleAddToCart(e, product)}
-                          disabled={isAdding}
+                          disabled={isAdding || isOutOfStock}
                         >
                           {isAdding ? (
                             <span className="spinner-small"></span>
                           ) : (
                             <>
-                              <CartPlusIcon size={16} /> Add to Cart
+                              <CartPlusIcon size={16} /> {isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
                             </>
                           )}
                         </button>
                         <button
                           className="prod-action-btn purchase"
                           onClick={(e) => handleBuyNow(e, product)}
+                          disabled={isOutOfStock}
                         >
-                          Buy Now
+                          {isOutOfStock ? 'Unavailable' : 'Buy Now'}
                         </button>
                       </div>
                     </div>
