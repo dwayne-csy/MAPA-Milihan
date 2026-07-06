@@ -6,7 +6,8 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import HistoryIcon from '@mui/icons-material/History';
 import MessageIcon from '@mui/icons-material/Message';
-import AssessmentIcon from '@mui/icons-material/Assessment'; // Add this import for report
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import WalletIcon from '@mui/icons-material/Wallet';
 import Badge from '@mui/material/Badge';
 import logo from '../logo/logo.png';
 
@@ -41,7 +42,6 @@ const Header = () => {
 
         if (response.ok && data.user) {
           setUser(data.user);
-          // Fetch cart count after user is loaded
           fetchCartCount();
         } else {
           localStorage.removeItem('token');
@@ -84,7 +84,6 @@ const Header = () => {
     }
   };
 
-  // Refresh cart count when navigating to cart or product pages
   useEffect(() => {
     if (location.pathname === '/cart' || location.pathname === '/product') {
       fetchCartCount();
@@ -122,11 +121,21 @@ const Header = () => {
   };
 
   const handleReport = () => {
-    navigate('/report'); // Adjust path as needed
+    navigate('/report');
+    setProfileMenuOpen(false);
+  };
+
+  const handleWallet = () => {
+    navigate('/wallet');
     setProfileMenuOpen(false);
   };
 
   const profileMenuItems = [
+    { 
+      label: 'Wallet Balance', 
+      icon: WalletIcon, 
+      action: handleWallet
+    },
     { 
       label: 'Order History', 
       icon: HistoryIcon, 
@@ -138,7 +147,7 @@ const Header = () => {
       action: handleMessages
     },
     { 
-      label: 'Reports', // Added Report button
+      label: 'Reports',
       icon: AssessmentIcon,
       action: handleReport
     },

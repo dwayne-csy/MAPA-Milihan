@@ -11,9 +11,10 @@ import AssignmentIcon from '@mui/icons-material/Assignment';
 import MessageIcon from '@mui/icons-material/Message';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import MapIcon from '@mui/icons-material/Map';
-import AssessmentIcon from '@mui/icons-material/Assessment'; // Add this import for Reports
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import WalletIcon from '@mui/icons-material/Wallet';
 import Badge from '@mui/material/Badge';
-import logo from '../logo/logo.png'; // Import the logo
+import logo from '../logo/logo.png';
 
 const FarmerHeader = () => {
   const [user, setUser] = useState(null);
@@ -83,9 +84,8 @@ const FarmerHeader = () => {
     }
   };
 
-  // Refresh cart count when navigating to cart or product pages
   useEffect(() => {
-    if (location.pathname === '/farmer/cart' || location.pathname === '/farmer/cart') {
+    if (location.pathname === '/farmer/cart' || location.pathname === '/farmer/product') {
       fetchCartCount();
     }
   }, [location.pathname]);
@@ -115,10 +115,20 @@ const FarmerHeader = () => {
   };
 
   const handleReports = () => {
-    navigate('/farmer/report'); // Adjust path as needed
+    navigate('/farmer/report');
+  };
+
+  const handleWallet = () => {
+    navigate('/farmer/wallet');
+    setDropdownOpen(false);
   };
 
   const dropdownItems = [
+    { 
+      label: 'Wallet', 
+      icon: WalletIcon, 
+      action: handleWallet
+    },
     { 
       label: 'Manage Orders', 
       icon: AssignmentIcon, 
@@ -130,7 +140,7 @@ const FarmerHeader = () => {
       action: handleMessage
     },
     { 
-      label: 'Reports', // Added Reports option
+      label: 'Reports',
       icon: AssessmentIcon,
       action: handleReports
     },
@@ -837,7 +847,7 @@ const FarmerHeader = () => {
           <div
             className="mobile-cart-link"
             onClick={() => {
-              navigate('/cart');
+              navigate('/farmer/cart');
               setMobileMenuOpen(false);
             }}
           >
