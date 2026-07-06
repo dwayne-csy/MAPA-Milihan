@@ -10,7 +10,12 @@ exports.checkout = async (req, res) => {
     console.log('🛒 Checkout request received');
     console.log('📦 Request body:', req.body);
     const userId = req.user.id;
-    const { paymentMethod = 'Cash on Delivery', address: providedAddress } = req.body;
+    const { 
+      paymentMethod = 'Cash on Delivery', 
+      address: providedAddress,
+      shippingDistance = 5,
+      shippingCost = 150
+    } = req.body;
 
     // Fetch user
     const user = await User.findById(userId);
@@ -73,12 +78,9 @@ exports.checkout = async (req, res) => {
       itemsPrice += product.price * item.quantity;
     }
 
-    // Calculate totals
-    const TAX_RATE = 0.12;
-    const SHIPPING_PRICE = 50;
-
-    const taxPrice = itemsPrice * TAX_RATE;
-    const totalPrice = itemsPrice + taxPrice + SHIPPING_PRICE;
+    // Calculate totals - Use shipping cost from frontend
+    const shippingPrice = shippingCost || 50;
+    const totalPrice = itemsPrice + shippingPrice;
 
     // Handle wallet payment
     let paymentStatus = 'Pending';
@@ -118,7 +120,9 @@ exports.checkout = async (req, res) => {
         street: providedAddress.street || '',
         zipcode: providedAddress.zipcode || '',
         phoneNo: user.contact || '',
-        country: 'Philippines'
+        country: 'Philippines',
+        shippingDistance: shippingDistance || 0,
+        shippingCost: shippingPrice
       };
     } else {
       shippingInfo = {
@@ -128,7 +132,9 @@ exports.checkout = async (req, res) => {
         street: user.address.street || '',
         zipcode: user.address.zipcode || '',
         phoneNo: user.contact || '',
-        country: 'Philippines'
+        country: 'Philippines',
+        shippingDistance: shippingDistance || 0,
+        shippingCost: shippingPrice
       };
     }
 
@@ -138,13 +144,14 @@ exports.checkout = async (req, res) => {
       orderItems,
       shippingInfo,
       itemsPrice,
-      taxPrice,
-      shippingPrice: SHIPPING_PRICE,
+      taxPrice: 0,
+      shippingPrice: shippingPrice,
       totalPrice,
       paymentStatus,
       paymentDetails,
       orderStatus: 'Processing',
-      paymentMethod: paymentMethod === 'Wallet' ? 'Wallet' : 'Cash on Delivery'
+      paymentMethod: paymentMethod === 'Wallet' ? 'Wallet' : 'Cash on Delivery',
+      shippingDistance: shippingDistance || 0
     });
 
     // Decrease stock for each product
@@ -188,7 +195,14 @@ exports.soloCheckout = async (req, res) => {
     console.log('🛒 Solo checkout request received');
     console.log('📦 Request body:', req.body);
     const userId = req.user.id;
-    const { productId, quantity = 1, paymentMethod = 'Cash on Delivery', address: providedAddress } = req.body;
+    const { 
+      productId, 
+      quantity = 1, 
+      paymentMethod = 'Cash on Delivery', 
+      address: providedAddress,
+      shippingDistance = 5,
+      shippingCost = 150
+    } = req.body;
 
     // Validate required fields
     if (!productId) {
@@ -249,13 +263,10 @@ exports.soloCheckout = async (req, res) => {
       farmerName: product.farmerName
     }];
 
-    // Calculate totals
-    const TAX_RATE = 0.12;
-    const SHIPPING_PRICE = 50;
-
+    // Calculate totals - Use shipping cost from frontend
+    const shippingPrice = shippingCost || 50;
     const itemsPrice = product.price * quantity;
-    const taxPrice = itemsPrice * TAX_RATE;
-    const totalPrice = itemsPrice + taxPrice + SHIPPING_PRICE;
+    const totalPrice = itemsPrice + shippingPrice;
 
     // Handle wallet payment
     let paymentStatus = 'Pending';
@@ -296,7 +307,9 @@ exports.soloCheckout = async (req, res) => {
         street: providedAddress.street || '',
         zipcode: providedAddress.zipcode || '',
         phoneNo: user.contact || '',
-        country: 'Philippines'
+        country: 'Philippines',
+        shippingDistance: shippingDistance || 0,
+        shippingCost: shippingPrice
       };
     } else {
       console.log('📦 Using user profile address:', user.address);
@@ -307,7 +320,9 @@ exports.soloCheckout = async (req, res) => {
         street: user.address.street || '',
         zipcode: user.address.zipcode || '',
         phoneNo: user.contact || '',
-        country: 'Philippines'
+        country: 'Philippines',
+        shippingDistance: shippingDistance || 0,
+        shippingCost: shippingPrice
       };
     }
 
@@ -317,13 +332,14 @@ exports.soloCheckout = async (req, res) => {
       orderItems,
       shippingInfo,
       itemsPrice,
-      taxPrice,
-      shippingPrice: SHIPPING_PRICE,
+      taxPrice: 0,
+      shippingPrice: shippingPrice,
       totalPrice,
       paymentStatus,
       paymentDetails,
       orderStatus: 'Processing',
-      paymentMethod: paymentMethod === 'Wallet' ? 'Wallet' : 'Cash on Delivery'
+      paymentMethod: paymentMethod === 'Wallet' ? 'Wallet' : 'Cash on Delivery',
+      shippingDistance: shippingDistance || 0
     });
 
     // Decrease stock

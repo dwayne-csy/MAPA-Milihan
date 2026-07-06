@@ -38,11 +38,12 @@ const Checkout = () => {
     }
   });
   const [user, setUser] = useState(null);
+  const [farmerLocation, setFarmerLocation] = useState(null);
 
   const token = localStorage.getItem('token');
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001';
 
-  const RATE_PER_KM = 40;
+  const RATE_PER_KM = 30;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -50,24 +51,85 @@ const Checkout = () => {
       await fetchWalletBalance();
       
       const state = location.state || {};
+      console.log('📍 Checkout location state:', state);
       
       if (state.cartItems && state.cartItems.length > 0) {
+        console.log('🛒 Cart items:', state.cartItems);
         setCartItems(state.cartItems);
         setIsCartCheckout(true);
         if (state.shippingAddress) {
           setAddress(state.shippingAddress);
         }
-        setShippingDistance(5);
-        setShippingCost(5 * RATE_PER_KM);
+        if (state.cartItems[0]?.farmerLocation) {
+          setFarmerLocation(state.cartItems[0].farmerLocation);
+        }
+        if (state.shippingDistance) {
+          setShippingDistance(state.shippingDistance);
+          setShippingCost(state.shippingDistance * RATE_PER_KM);
+        } else {
+          setShippingDistance(5);
+          setShippingCost(5 * RATE_PER_KM);
+        }
       } else if (state.product) {
-        // FIXED: Set quantity to 1 instead of using product's stock
-        setSingleProduct({
-          ...state.product,
-          quantity: 1 // Always start with 1
-        });
+        console.log('📦 Solo product from state:', state.product);
+        
+        // Fetch the full product details to get correct stock
+        try {
+          const productId = state.product._id || state.product.productId;
+          if (productId) {
+            console.log('🔍 Fetching product details for ID:', productId);
+            const response = await axios.get(`${API_BASE_URL}/api/v1/products/${productId}`, {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+            
+            if (response.data.success) {
+              const fullProduct = response.data.product;
+              console.log('✅ Full product data:', fullProduct);
+              console.log('📊 Stock from API:', fullProduct.quantity);
+              
+              setSingleProduct({
+                ...fullProduct,
+                quantity: 1,
+                // Make sure stock is available
+                stock: fullProduct.quantity || fullProduct.stock || 0
+              });
+            } else {
+              // Fallback to state product if API fails
+              setSingleProduct({
+                ...state.product,
+                quantity: 1,
+                stock: state.product.quantity || state.product.stock || 0
+              });
+            }
+          } else {
+            // Fallback
+            setSingleProduct({
+              ...state.product,
+              quantity: 1,
+              stock: state.product.quantity || state.product.stock || 0
+            });
+          }
+        } catch (error) {
+          console.error('❌ Error fetching product details:', error);
+          // Fallback to state product
+          setSingleProduct({
+            ...state.product,
+            quantity: 1,
+            stock: state.product.quantity || state.product.stock || 0
+          });
+        }
+        
         setIsCartCheckout(false);
-        setShippingDistance(5);
-        setShippingCost(5 * RATE_PER_KM);
+        if (state.product.farmerLocation || state.product.location) {
+          setFarmerLocation(state.product.farmerLocation || state.product.location);
+        }
+        if (state.shippingDistance) {
+          setShippingDistance(state.shippingDistance);
+          setShippingCost(state.shippingDistance * RATE_PER_KM);
+        } else {
+          setShippingDistance(5);
+          setShippingCost(5 * RATE_PER_KM);
+        }
       } else {
         toast.error('No items to checkout');
         navigate('/cart');
@@ -90,6 +152,16 @@ const Checkout = () => {
             ...response.data.user.address
           }));
         }
+        if (response.data.user.address?.location) {
+          if (farmerLocation) {
+            calculateDistance(
+              response.data.user.address.location.lat,
+              response.data.user.address.location.lng,
+              farmerLocation.lat,
+              farmerLocation.lng
+            );
+          }
+        }
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
@@ -109,49 +181,89 @@ const Checkout = () => {
     }
   };
 
-  // ========== QUANTITY MANAGEMENT FOR SOLO PRODUCT ==========
-  const handleQuantityChange = (newQuantity) => {
-    if (!singleProduct) return;
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return;
     
-    // Ensure quantity is within valid range
-    if (newQuantity < 1) {
-      toast.error('Quantity cannot be less than 1');
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const distance = R * c;
+    
+    setShippingDistance(parseFloat(distance.toFixed(1)));
+    setShippingCost(parseFloat((distance * RATE_PER_KM).toFixed(2)));
+  };
+
+  // ========== QUANTITY MANAGEMENT FOR SOLO PRODUCT ==========
+  const incrementQuantity = () => {
+    console.log('➕ Increment button clicked');
+    if (!singleProduct) {
+      console.log('❌ singleProduct is null');
       return;
     }
     
-    // Use the product's available stock (not the current quantity)
+    const currentQty = singleProduct.quantity || 1;
+    // Use the correct stock field
     const maxStock = singleProduct.stock || singleProduct.quantity || 0;
-    if (newQuantity > maxStock) {
+    console.log(`📊 Current: ${currentQty}, Max Stock: ${maxStock}`);
+    console.log('📦 Product data:', singleProduct);
+    
+    if (maxStock <= 0) {
+      toast.error('No stock available');
+      return;
+    }
+    
+    if (currentQty >= maxStock) {
       toast.error(`Only ${maxStock} items available`);
       return;
     }
     
+    const newQty = currentQty + 1;
+    console.log(`✅ New quantity: ${newQty}`);
+    
     setSingleProduct({
       ...singleProduct,
-      quantity: newQuantity
+      quantity: newQty
     });
   };
 
-  const incrementQuantity = () => {
-    if (!singleProduct) return;
-    handleQuantityChange((singleProduct.quantity || 1) + 1);
-  };
-
   const decrementQuantity = () => {
-    if (!singleProduct) return;
-    handleQuantityChange((singleProduct.quantity || 1) - 1);
-  };
-
-  // ========== QUANTITY MANAGEMENT FOR CART ITEMS ==========
-  const handleCartQuantityChange = (index, newQuantity) => {
-    if (newQuantity < 1) {
+    console.log('➖ Decrement button clicked');
+    if (!singleProduct) {
+      console.log('❌ singleProduct is null');
+      return;
+    }
+    
+    const currentQty = singleProduct.quantity || 1;
+    console.log(`📊 Current: ${currentQty}`);
+    
+    if (currentQty <= 1) {
       toast.error('Quantity cannot be less than 1');
       return;
     }
     
+    const newQty = currentQty - 1;
+    console.log(`✅ New quantity: ${newQty}`);
+    
+    setSingleProduct({
+      ...singleProduct,
+      quantity: newQty
+    });
+  };
+
+  // ========== QUANTITY MANAGEMENT FOR CART ITEMS ==========
+  const incrementCartQuantity = (index) => {
+    console.log('➕ Cart increment clicked for index:', index);
     const item = cartItems[index];
-    const maxStock = item.stock || item.availableQuantity || 999;
-    if (newQuantity > maxStock) {
+    if (!item) return;
+    
+    const currentQty = item.quantity || 1;
+    const maxStock = item.stock || item.availableQuantity || item.quantity || 999;
+    
+    if (currentQty >= maxStock) {
       toast.error(`Only ${maxStock} items available`);
       return;
     }
@@ -159,19 +271,29 @@ const Checkout = () => {
     const updatedItems = [...cartItems];
     updatedItems[index] = {
       ...updatedItems[index],
-      quantity: newQuantity
+      quantity: currentQty + 1
     };
     setCartItems(updatedItems);
   };
 
-  const incrementCartQuantity = (index) => {
-    const currentQuantity = cartItems[index].quantity || 1;
-    handleCartQuantityChange(index, currentQuantity + 1);
-  };
-
   const decrementCartQuantity = (index) => {
-    const currentQuantity = cartItems[index].quantity || 1;
-    handleCartQuantityChange(index, currentQuantity - 1);
+    console.log('➖ Cart decrement clicked for index:', index);
+    const item = cartItems[index];
+    if (!item) return;
+    
+    const currentQty = item.quantity || 1;
+    
+    if (currentQty <= 1) {
+      toast.error('Quantity cannot be less than 1');
+      return;
+    }
+    
+    const updatedItems = [...cartItems];
+    updatedItems[index] = {
+      ...updatedItems[index],
+      quantity: currentQty - 1
+    };
+    setCartItems(updatedItems);
   };
 
   // ========== REMOVE ITEM FROM CART ==========
@@ -186,7 +308,7 @@ const Checkout = () => {
 
   const getSubtotal = () => {
     if (isCartCheckout) {
-      return cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
+      return cartItems.reduce((total, item) => total + (item.price * (item.quantity || 1)), 0);
     } else if (singleProduct) {
       return singleProduct.price * (singleProduct.quantity || 1);
     }
@@ -198,7 +320,6 @@ const Checkout = () => {
   };
 
   const handlePlaceOrder = async () => {
-    // Validate address fields
     if (!address.city || !address.barangay || !address.street || !address.zipcode) {
       toast.error('Please fill in all address fields');
       return;
@@ -209,19 +330,16 @@ const Checkout = () => {
       return;
     }
 
-    // Check if cart is empty
     if (isCartCheckout && cartItems.length === 0) {
       toast.error('Your cart is empty');
       return;
     }
 
-    // Check if single product quantity is valid
-    if (!isCartCheckout && (!singleProduct || singleProduct.quantity < 1)) {
+    if (!isCartCheckout && (!singleProduct || (singleProduct.quantity || 1) < 1)) {
       toast.error('Invalid product quantity');
       return;
     }
 
-    // Check wallet balance if wallet payment is selected
     if (selectedPaymentMethod === 'Wallet' && walletBalance < getTotal()) {
       toast.error(`Insufficient wallet balance. Available: ₱${walletBalance.toFixed(2)}, Required: ₱${getTotal().toFixed(2)}`);
       return;
@@ -237,7 +355,9 @@ const Checkout = () => {
         endpoint = `${API_BASE_URL}/api/v1/orders/checkout`;
         payload = {
           paymentMethod: selectedPaymentMethod,
-          address: address
+          address: address,
+          shippingDistance: shippingDistance,
+          shippingCost: shippingCost
         };
       } else {
         endpoint = `${API_BASE_URL}/api/v1/orders/checkout/solo`;
@@ -245,7 +365,9 @@ const Checkout = () => {
           productId: singleProduct.productId || singleProduct._id,
           quantity: singleProduct.quantity || 1,
           paymentMethod: selectedPaymentMethod,
-          address: address
+          address: address,
+          shippingDistance: shippingDistance,
+          shippingCost: shippingCost
         };
       }
 
@@ -260,10 +382,12 @@ const Checkout = () => {
 
       if (response.data.success) {
         toast.success('Order placed successfully!');
-        navigate('/orders', { 
+        navigate('/checkout/confirmation', {  // Changed from '/checkout-confirmation' to '/checkout/confirmation'
           state: { 
             orderId: response.data.order._id,
-            paymentMethod: selectedPaymentMethod
+            paymentMethod: selectedPaymentMethod,
+            shippingDistance: shippingDistance,
+            shippingCost: shippingCost
           }
         });
       }
@@ -303,50 +427,54 @@ const Checkout = () => {
               <h2 className="text-sm font-semibold text-gray-800 mb-3">Order Summary</h2>
               <div className="space-y-3">
                 {isCartCheckout ? (
-                  cartItems.map((item, index) => (
-                    <div key={index} className="flex items-center gap-3 pb-3 border-b border-gray-100 last:border-0">
-                      <img 
-                        src={item.image || item.images?.[0]?.url || '/default-product.png'} 
-                        alt={item.name}
-                        className="w-16 h-16 object-cover rounded-lg"
-                      />
-                      <div className="flex-1">
-                        <h3 className="text-sm font-medium text-gray-800">{item.name}</h3>
-                        <div className="flex items-center gap-2 mt-1">
-                          {/* Quantity Controls for Cart Items */}
-                          <div className="flex items-center gap-1 border border-gray-200 rounded-lg">
-                            <button
-                              onClick={() => decrementCartQuantity(index)}
-                              className="p-1 hover:bg-gray-100 rounded-l-lg transition-colors"
-                              disabled={item.quantity <= 1}
-                            >
-                              <FiMinus size={14} className={item.quantity <= 1 ? 'text-gray-300' : 'text-gray-600'} />
-                            </button>
-                            <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
-                            <button
-                              onClick={() => incrementCartQuantity(index)}
-                              className="p-1 hover:bg-gray-100 rounded-r-lg transition-colors"
-                            >
-                              <FiPlus size={14} className="text-gray-600" />
-                            </button>
+                  cartItems.map((item, index) => {
+                    const currentQty = item.quantity || 1;
+                    const maxStock = item.stock || item.availableQuantity || item.quantity || 999;
+                    return (
+                      <div key={index} className="flex items-center gap-3 pb-3 border-b border-gray-100 last:border-0">
+                        <img 
+                          src={item.image || item.images?.[0]?.url || '/default-product.png'} 
+                          alt={item.name}
+                          className="w-16 h-16 object-cover rounded-lg"
+                        />
+                        <div className="flex-1">
+                          <h3 className="text-sm font-medium text-gray-800">{item.name}</h3>
+                          <div className="flex items-center gap-2 mt-1">
+                            <div className="flex items-center gap-1 border border-gray-200 rounded-lg">
+                              <button
+                                onClick={() => decrementCartQuantity(index)}
+                                className="p-1 hover:bg-gray-100 rounded-l-lg transition-colors"
+                                type="button"
+                              >
+                                <FiMinus size={14} className="text-gray-600" />
+                              </button>
+                              <span className="w-8 text-center text-sm font-medium">{currentQty}</span>
+                              <button
+                                onClick={() => incrementCartQuantity(index)}
+                                className="p-1 hover:bg-gray-100 rounded-r-lg transition-colors"
+                                type="button"
+                              >
+                                <FiPlus size={14} className="text-gray-600" />
+                              </button>
+                            </div>
+                            <span className="text-xs text-gray-400">
+                              Stock: {maxStock}
+                            </span>
                           </div>
-                          <span className="text-xs text-gray-400">
-                            Stock: {item.stock || item.availableQuantity || 'N/A'}
-                          </span>
+                          <p className="text-sm font-semibold text-green-600 mt-1">
+                            ₱{(item.price * currentQty).toFixed(2)}
+                          </p>
                         </div>
-                        <p className="text-sm font-semibold text-green-600 mt-1">
-                          ₱{(item.price * item.quantity).toFixed(2)}
-                        </p>
+                        <button
+                          onClick={() => removeCartItem(index)}
+                          className="text-red-500 hover:text-red-700 text-sm font-medium"
+                          type="button"
+                        >
+                          Remove
+                        </button>
                       </div>
-                      {/* Remove Button */}
-                      <button
-                        onClick={() => removeCartItem(index)}
-                        className="text-red-500 hover:text-red-700 text-sm font-medium"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))
+                    );
+                  })
                 ) : singleProduct && (
                   <div className="flex items-center gap-3">
                     <img 
@@ -357,25 +485,25 @@ const Checkout = () => {
                     <div className="flex-1">
                       <h3 className="text-sm font-medium text-gray-800">{singleProduct.name}</h3>
                       <div className="flex items-center gap-2 mt-1">
-                        {/* Quantity Controls for Solo Product */}
                         <div className="flex items-center gap-1 border border-gray-200 rounded-lg">
                           <button
                             onClick={decrementQuantity}
                             className="p-1 hover:bg-gray-100 rounded-l-lg transition-colors"
-                            disabled={singleProduct.quantity <= 1}
+                            type="button"
                           >
-                            <FiMinus size={14} className={singleProduct.quantity <= 1 ? 'text-gray-300' : 'text-gray-600'} />
+                            <FiMinus size={14} className="text-gray-600" />
                           </button>
-                          <span className="w-8 text-center text-sm font-medium">{singleProduct.quantity}</span>
+                          <span className="w-8 text-center text-sm font-medium">{singleProduct.quantity || 1}</span>
                           <button
                             onClick={incrementQuantity}
                             className="p-1 hover:bg-gray-100 rounded-r-lg transition-colors"
+                            type="button"
                           >
                             <FiPlus size={14} className="text-gray-600" />
                           </button>
                         </div>
                         <span className="text-xs text-gray-400">
-                          Stock: {singleProduct.stock || singleProduct.availableQuantity || 'N/A'}
+                          Stock: {singleProduct.stock || singleProduct.quantity || 0}
                         </span>
                       </div>
                       <p className="text-sm font-semibold text-green-600 mt-1">
@@ -462,7 +590,7 @@ const Checkout = () => {
                 </div>
                 {shippingDistance > 0 && (
                   <div className="text-xs text-gray-400 text-right">
-                    Distance: {shippingDistance.toFixed(2)} km
+                    Distance: {shippingDistance.toFixed(1)} km
                   </div>
                 )}
                 <div className="border-t border-gray-200 pt-2 mt-2">
@@ -485,6 +613,7 @@ const Checkout = () => {
                       ? 'border-green-500 bg-green-50' 
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
+                  type="button"
                 >
                   <FiCreditCard className={`text-lg ${selectedPaymentMethod === 'COD' ? 'text-green-500' : 'text-gray-400'}`} />
                   <div className="flex-1 text-left">
@@ -503,6 +632,7 @@ const Checkout = () => {
                       ? 'border-green-500 bg-green-50' 
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
+                  type="button"
                 >
                   <MdWallet className={`text-lg ${selectedPaymentMethod === 'Wallet' ? 'text-green-500' : 'text-gray-400'}`} />
                   <div className="flex-1 text-left">
@@ -522,6 +652,7 @@ const Checkout = () => {
                     <button 
                       onClick={() => navigate('/wallet')}
                       className="ml-1 text-green-600 hover:underline font-medium"
+                      type="button"
                     >
                       Top up now
                     </button>
@@ -535,6 +666,7 @@ const Checkout = () => {
               onClick={handlePlaceOrder}
               disabled={loading || (isCartCheckout && cartItems.length === 0)}
               className="w-full py-3 px-4 bg-green-500 text-white rounded-xl font-medium hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              type="button"
             >
               {loading ? (
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>

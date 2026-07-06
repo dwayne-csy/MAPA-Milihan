@@ -36,7 +36,6 @@ const UserWallet = () => {
   const [quickAmounts, setQuickAmounts] = useState([50, 100, 200, 500, 1000]);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('gcash');
   const [showPaymentDropdown, setShowPaymentDropdown] = useState(false);
-  const [totalTopups, setTotalTopups] = useState(0);
   const [totalSpent, setTotalSpent] = useState(0);
   
   // Payment account details
@@ -107,21 +106,17 @@ const UserWallet = () => {
 
   // Calculate totals from transactions
   const calculateTotals = useCallback((transactionsList) => {
-    let topups = 0;
     let spent = 0;
     
     transactionsList.forEach(t => {
-      if (t.type === 'credit' && t.status === 'completed') {
-        topups += t.amount;
-      } else if (t.type === 'debit' && t.status === 'completed') {
+      if (t.type === 'debit' && t.status === 'completed') {
         spent += t.amount;
       }
     });
     
-    setTotalTopups(topups);
     setTotalSpent(spent);
     
-    return { totalTopups: topups, totalSpent: spent };
+    return { totalSpent: spent };
   }, []);
 
   // Fetch wallet balance
@@ -173,23 +168,16 @@ const UserWallet = () => {
         calculateTotals(transactionsData);
       } else {
         setTransactions([]);
-        setTotalTopups(0);
         setTotalSpent(0);
       }
     } catch (error) {
       console.error('Error fetching transactions:', error);
-      if (walletBalance > 0 && transactions.length === 0) {
-        setTotalTopups(walletBalance);
-        setTotalSpent(0);
-      } else {
-        setTransactions([]);
-        setTotalTopups(0);
-        setTotalSpent(0);
-      }
+      setTransactions([]);
+      setTotalSpent(0);
     } finally {
       setLoadingTransactions(false);
     }
-  }, [API_BASE_URL, token, walletBalance, transactions.length, calculateTotals]);
+  }, [API_BASE_URL, token, calculateTotals]);
 
   // Reset form fields
   const resetForm = () => {
@@ -241,9 +229,11 @@ const UserWallet = () => {
       );
 
       if (response.data.success) {
+        // Update wallet balance
         setWalletBalance(response.data.walletBalance);
+        
+        // Refresh transactions
         await fetchTransactions();
-        setTotalTopups(prev => prev + amount);
         
         toast.success(`✅ Successfully added ₱${amount} to your wallet via ${method?.name}`);
         setShowTopUpModal(false);
@@ -410,8 +400,8 @@ const UserWallet = () => {
           </div>
         </div>
 
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        {/* Quick Stats - Removed Total Top-ups, kept Available Balance and Total Spent */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
           <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-green-50 rounded-lg">
@@ -421,19 +411,6 @@ const UserWallet = () => {
                 <div className="text-xs text-gray-500 font-medium">Available Balance</div>
                 <div className="text-lg font-semibold text-gray-800">
                   {formatCurrency(walletBalance)}
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-50 rounded-lg">
-                <FiCreditCard className="text-blue-600 text-lg" />
-              </div>
-              <div>
-                <div className="text-xs text-gray-500 font-medium">Total Top-ups</div>
-                <div className="text-lg font-semibold text-gray-800">
-                  {formatCurrency(totalTopups)}
                 </div>
               </div>
             </div>
@@ -481,7 +458,7 @@ const UserWallet = () => {
             ) : (
               <div className="space-y-3">
                 {transactions.map((transaction) => (
-                  <div key={transaction._id || transaction.id || Date.now()} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                  <div key={transaction._id || transaction.id || transaction.orderId || Date.now()} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-white rounded-lg shadow-sm">
                         {getTransactionIcon(transaction.type)}

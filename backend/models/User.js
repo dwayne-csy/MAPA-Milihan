@@ -1,3 +1,4 @@
+// backend/models/User.js
 const mongoose = require('mongoose');
 const validator = require('validator');
 const bcrypt = require('bcryptjs');
@@ -150,7 +151,7 @@ userSchema.methods.getEmailVerificationToken = function () {
     return verifyToken;
 };
 
-// ========== NEW METHODS FOR WALLET AND ROLE ==========
+// ========== WALLET AND ROLE METHODS ==========
 
 // Wallet management methods
 userSchema.methods.addWalletBalance = async function(amount) {

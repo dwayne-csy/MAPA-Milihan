@@ -19,7 +19,7 @@ const {
   addWalletBalance,
   deductWalletBalance,
   checkWalletBalance,
-  getWalletTransactions, // Add this import
+  getWalletTransactions,
   updateUserRole,
   getAllUsers,
   getUsersByRole
@@ -57,12 +57,12 @@ router.put('/me/update', isAuthenticatedUser, upload.single('avatar'), updatePro
 // ========== USER AVATAR ROUTE ==========
 router.get('/:userId/avatar', getUserAvatar);
 
-// ========== WALLET ROUTES (User, Farmer, Rider only) ==========
+// ========== WALLET ROUTES ==========
 router.get('/wallet/balance', isAuthenticatedUser, getWalletBalance);
 router.post('/wallet/add', isAuthenticatedUser, addWalletBalance);
 router.post('/wallet/deduct', isAuthenticatedUser, deductWalletBalance);
 router.post('/wallet/check', isAuthenticatedUser, checkWalletBalance);
-router.get('/wallet/transactions', isAuthenticatedUser, getWalletTransactions); // Add this route
+router.get('/wallet/transactions', isAuthenticatedUser, getWalletTransactions);
 
 // ========== ADMIN ROUTES ==========
 router.put('/admin/role/:userId', isAuthenticatedUser, isAdmin, updateUserRole);

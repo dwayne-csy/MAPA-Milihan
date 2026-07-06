@@ -75,7 +75,20 @@ const orderSchema = new mongoose.Schema({
     country: {
       type: String,
       default: 'Philippines'
+    },
+    shippingDistance: {
+      type: Number,
+      default: 0
+    },
+    shippingCost: {
+      type: Number,
+      default: 0
     }
+  },
+  
+  shippingDistance: {
+    type: Number,
+    default: 0
   },
   
   paymentMethod: {

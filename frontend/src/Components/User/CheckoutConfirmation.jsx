@@ -1,3 +1,4 @@
+// frontend/src/Components/User/CheckoutConfirmation.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
@@ -9,7 +10,8 @@ import {
   FiTruck, 
   FiMapPin, 
   FiDollarSign, 
-  FiCreditCard
+  FiCreditCard,
+  FiNavigation
 } from 'react-icons/fi';
 import { MdWallet } from 'react-icons/md';
 
@@ -18,6 +20,8 @@ const CheckoutConfirmation = () => {
   const location = useLocation();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [shippingDistance, setShippingDistance] = useState(0);
+  const [shippingCost, setShippingCost] = useState(0);
   const token = localStorage.getItem('token');
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001';
 
@@ -28,6 +32,14 @@ const CheckoutConfirmation = () => {
       toast.error('No order found');
       navigate('/orders');
       return;
+    }
+
+    // Get shipping info from location state
+    if (location.state?.shippingDistance) {
+      setShippingDistance(location.state.shippingDistance);
+    }
+    if (location.state?.shippingCost) {
+      setShippingCost(location.state.shippingCost);
     }
 
     fetchOrderDetails();
@@ -141,10 +153,20 @@ const CheckoutConfirmation = () => {
             </div>
 
             <div className="flex items-center gap-3 text-sm">
+              <FiNavigation className="text-blue-500" />
+              <div>
+                <p className="text-gray-700">Shipping Distance</p>
+                <p className="text-xs text-gray-500">
+                  {shippingDistance > 0 ? `${shippingDistance.toFixed(1)} km` : 'Distance calculated'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 text-sm">
               <FiTruck className="text-gray-400" />
               <div>
                 <p className="text-gray-700">Shipping Fee</p>
-                <p className="text-xs text-gray-500">₱{order.shippingPrice?.toFixed(2) || '0.00'}</p>
+                <p className="text-xs text-gray-500">₱{shippingCost > 0 ? shippingCost.toFixed(2) : (order.shippingPrice?.toFixed(2) || '0.00')}</p>
               </div>
             </div>
 
@@ -175,7 +197,11 @@ const CheckoutConfirmation = () => {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Shipping Fee</span>
-                <span className="font-medium">₱{order.shippingPrice?.toFixed(2) || '0.00'}</span>
+                <span className="font-medium">₱{shippingCost > 0 ? shippingCost.toFixed(2) : (order.shippingPrice?.toFixed(2) || '0.00')}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Distance</span>
+                <span className="font-medium">{shippingDistance > 0 ? `${shippingDistance.toFixed(1)} km` : 'N/A'}</span>
               </div>
               <div className="flex justify-between text-lg font-bold mt-2 pt-2 border-t border-gray-200">
                 <span>Total</span>
@@ -194,7 +220,7 @@ const CheckoutConfirmation = () => {
             View Order Details
           </button>
           <button
-            onClick={() => navigate('/products')}
+            onClick={() => navigate('/product')}
             className="flex-1 py-3 px-4 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors"
           >
             Continue Shopping
