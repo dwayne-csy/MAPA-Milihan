@@ -46,6 +46,7 @@ exports.checkout = async (req, res) => {
     // Validate stock and prepare order items
     const orderItems = [];
     let itemsPrice = 0;
+    const farmerPayments = {}; // Track payments per farmer
 
     for (const item of cart.items) {
       const product = item.product;
@@ -64,6 +65,29 @@ exports.checkout = async (req, res) => {
         });
       }
 
+      const itemTotal = product.price * item.quantity;
+      
+      // Track farmer payments
+      const farmerId = product.farmer ? product.farmer.toString() : null;
+      if (farmerId) {
+        if (!farmerPayments[farmerId]) {
+          farmerPayments[farmerId] = {
+            farmerId: farmerId,
+            farmerName: product.farmerName || 'Unknown Farmer',
+            amount: 0,
+            items: []
+          };
+        }
+        farmerPayments[farmerId].amount += itemTotal;
+        farmerPayments[farmerId].items.push({
+          productId: product._id,
+          productName: product.name,
+          quantity: item.quantity,
+          price: product.price,
+          unit: product.unit
+        });
+      }
+
       orderItems.push({
         product: product._id,
         name: product.name,
@@ -78,7 +102,7 @@ exports.checkout = async (req, res) => {
       itemsPrice += product.price * item.quantity;
     }
 
-    // Calculate totals - Use shipping cost from frontend
+    // Calculate totals
     const shippingPrice = shippingCost || 50;
     const totalPrice = itemsPrice + shippingPrice;
 
@@ -95,9 +119,30 @@ exports.checkout = async (req, res) => {
         });
       }
 
-      // Deduct from wallet
+      // Deduct from user's wallet
       const previousBalance = user.walletBalance;
       await user.deductWalletBalance(totalPrice);
+      
+      // ========== DISTRIBUTE PAYMENTS TO FARMERS ==========
+      const farmerDistribution = [];
+      for (const farmerId in farmerPayments) {
+        const farmerData = farmerPayments[farmerId];
+        const farmer = await User.findById(farmerId);
+        
+        if (farmer) {
+          // Add the amount to farmer's wallet
+          await farmer.addWalletBalance(farmerData.amount);
+          
+          farmerDistribution.push({
+            farmerId: farmerId,
+            farmerName: farmerData.farmerName,
+            amount: farmerData.amount,
+            items: farmerData.items
+          });
+          
+          console.log(`💰 Added ₱${farmerData.amount.toFixed(2)} to farmer ${farmer.name}'s wallet`);
+        }
+      }
       
       paymentStatus = 'Paid';
       paymentDetails = {
@@ -106,11 +151,12 @@ exports.checkout = async (req, res) => {
         walletAmountUsed: totalPrice,
         previousBalance: previousBalance,
         newBalance: user.walletBalance,
-        paymentDate: new Date()
+        paymentDate: new Date(),
+        farmerDistribution: farmerDistribution // Track which farmers got paid
       };
     }
 
-    // Create shipping info from user address or provided address
+    // Create shipping info
     let shippingInfo;
     if (providedAddress && providedAddress.city && providedAddress.barangay) {
       shippingInfo = {
@@ -151,7 +197,8 @@ exports.checkout = async (req, res) => {
       paymentDetails,
       orderStatus: 'Processing',
       paymentMethod: paymentMethod === 'Wallet' ? 'Wallet' : 'Cash on Delivery',
-      shippingDistance: shippingDistance || 0
+      shippingDistance: shippingDistance || 0,
+      farmerPayments: farmerDistribution // Store farmer payment distribution
     });
 
     // Decrease stock for each product
@@ -177,7 +224,8 @@ exports.checkout = async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Order placed successfully!',
-      order: populatedOrder
+      order: populatedOrder,
+      farmerPayments: farmerDistribution // Return farmer payment info
     });
 
   } catch (error) {
@@ -263,7 +311,7 @@ exports.soloCheckout = async (req, res) => {
       farmerName: product.farmerName
     }];
 
-    // Calculate totals - Use shipping cost from frontend
+    // Calculate totals
     const shippingPrice = shippingCost || 50;
     const itemsPrice = product.price * quantity;
     const totalPrice = itemsPrice + shippingPrice;
@@ -281,9 +329,29 @@ exports.soloCheckout = async (req, res) => {
         });
       }
 
-      // Deduct from wallet
+      // Deduct from user's wallet
       const previousBalance = user.walletBalance;
       await user.deductWalletBalance(totalPrice);
+      
+      // ========== PAY THE FARMER ==========
+      let farmerPayment = null;
+      if (product.farmer) {
+        const farmer = await User.findById(product.farmer);
+        if (farmer) {
+          // Add the amount to farmer's wallet (itemsPrice only, shipping goes to platform)
+          await farmer.addWalletBalance(itemsPrice);
+          
+          farmerPayment = {
+            farmerId: farmer._id,
+            farmerName: farmer.name || product.farmerName || 'Unknown Farmer',
+            amount: itemsPrice,
+            productName: product.name,
+            quantity: quantity
+          };
+          
+          console.log(`💰 Added ₱${itemsPrice.toFixed(2)} to farmer ${farmer.name}'s wallet`);
+        }
+      }
       
       paymentStatus = 'Paid';
       paymentDetails = {
@@ -292,14 +360,14 @@ exports.soloCheckout = async (req, res) => {
         walletAmountUsed: totalPrice,
         previousBalance: previousBalance,
         newBalance: user.walletBalance,
-        paymentDate: new Date()
+        paymentDate: new Date(),
+        farmerPayment: farmerPayment // Track which farmer got paid
       };
     }
 
-    // Create shipping info from user address or provided address
+    // Create shipping info
     let shippingInfo;
     if (providedAddress && providedAddress.city && providedAddress.barangay) {
-      console.log('📦 Using provided address:', providedAddress);
       shippingInfo = {
         address: `${providedAddress.street || ''}, ${providedAddress.barangay || ''}, ${providedAddress.city || ''}`,
         city: providedAddress.city || '',
@@ -312,7 +380,6 @@ exports.soloCheckout = async (req, res) => {
         shippingCost: shippingPrice
       };
     } else {
-      console.log('📦 Using user profile address:', user.address);
       shippingInfo = {
         address: `${user.address.street || ''}, ${user.address.barangay || ''}, ${user.address.city || ''}`,
         city: user.address.city || '',
@@ -450,12 +517,26 @@ exports.cancelOrder = async (req, res) => {
       });
     }
 
-    // If payment was made via wallet, refund the amount
+    // If payment was made via wallet, refund the user AND deduct from farmers
     if (order.paymentMethod === 'Wallet' && order.paymentStatus === 'Paid') {
       const user = await User.findById(userId);
       if (user) {
+        // Refund the user
         await user.addWalletBalance(order.totalPrice);
         console.log(`💰 Refunded ₱${order.totalPrice.toFixed(2)} to user's wallet`);
+        
+        // Deduct from farmers
+        if (order.paymentDetails && order.paymentDetails.farmerDistribution) {
+          for (const farmerPayment of order.paymentDetails.farmerDistribution) {
+            const farmer = await User.findById(farmerPayment.farmerId);
+            if (farmer) {
+              // Deduct the amount from farmer's wallet
+              farmer.walletBalance = Math.max(farmer.walletBalance - farmerPayment.amount, 0);
+              await farmer.save();
+              console.log(`💰 Deducted ₱${farmerPayment.amount.toFixed(2)} from farmer ${farmer.name}'s wallet (Order Cancelled)`);
+            }
+          }
+        }
       }
     }
 

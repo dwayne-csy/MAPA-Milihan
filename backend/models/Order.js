@@ -39,6 +39,34 @@ const orderItemSchema = new mongoose.Schema({
   }
 });
 
+// Add farmerPayments schema
+const farmerPaymentSchema = new mongoose.Schema({
+  farmerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  farmerName: {
+    type: String,
+    required: true
+  },
+  amount: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  items: [{
+    productId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Product'
+    },
+    productName: String,
+    quantity: Number,
+    price: Number,
+    unit: String
+  }]
+}, { _id: false });
+
 const orderSchema = new mongoose.Schema({
   user: {
     type: mongoose.Schema.Types.ObjectId,
@@ -111,8 +139,12 @@ const orderSchema = new mongoose.Schema({
     walletTransactionId: String,
     walletAmountUsed: Number,
     previousBalance: Number,
-    newBalance: Number
+    newBalance: Number,
+    farmerDistribution: [farmerPaymentSchema] // Track payments to farmers
   },
+  
+  // Track farmer payments separately for easier querying
+  farmerPayments: [farmerPaymentSchema],
   
   orderStatus: {
     type: String,
@@ -182,5 +214,6 @@ orderSchema.pre('save', function(next) {
 orderSchema.index({ user: 1, createdAt: -1 });
 orderSchema.index({ orderStatus: 1 });
 orderSchema.index({ createdAt: -1 });
+orderSchema.index({ 'farmerPayments.farmerId': 1 }); // For farmer transaction queries
 
 module.exports = mongoose.model('Order', orderSchema);

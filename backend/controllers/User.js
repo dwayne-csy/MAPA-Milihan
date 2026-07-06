@@ -1107,7 +1107,7 @@ exports.getWalletTransactions = async (req, res) => {
     console.log('💰 Get wallet transactions request received');
     const userId = req.user.id;
     
-    // Get the user to check wallet balance
+    // Get the user
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({
@@ -1116,24 +1116,62 @@ exports.getWalletTransactions = async (req, res) => {
       });
     }
     
-    // Get all orders where user used wallet
+    const transactions = [];
+    
+    // Check if user is a farmer
+    if (user.role === 'farmer') {
+      // Get orders where this farmer received payments
+      const Order = require('../models/Order');
+      const orders = await Order.find({
+        'farmerPayments.farmerId': userId,
+        paymentStatus: 'Paid'
+      }).sort({ createdAt: -1 });
+      
+      // Transform orders into credit transactions (earnings)
+      orders.forEach(order => {
+        const farmerPayment = order.farmerPayments.find(
+          fp => fp.farmerId.toString() === userId.toString()
+        );
+        if (farmerPayment) {
+          const description = `Order #${order._id.toString().slice(-8).toUpperCase()} - ${farmerPayment.items.map(item => item.productName).join(', ')}`;
+          transactions.push({
+            id: order._id,
+            type: 'credit',
+            amount: farmerPayment.amount,
+            status: 'completed',
+            description: description,
+            createdAt: order.createdAt,
+            orderId: order._id,
+            orderStatus: order.orderStatus
+          });
+        }
+      });
+    }
+    
+    // Get all orders where user used wallet (debit transactions)
     const Order = require('../models/Order');
-    const orders = await Order.find({
+    const debitOrders = await Order.find({
       user: userId,
       paymentMethod: 'Wallet'
     }).sort({ createdAt: -1 });
-
-    // Transform orders into transaction format
-    const transactions = orders.map(order => ({
-      id: order._id,
-      type: 'debit',
-      amount: order.totalPrice,
-      status: order.paymentStatus === 'Paid' ? 'completed' : 'pending',
-      description: `Order #${order._id.toString().slice(-8).toUpperCase()} - ${order.orderItems.map(item => item.name).join(', ')}`,
-      createdAt: order.createdAt,
-      orderId: order._id,
-      orderStatus: order.orderStatus
-    }));
+    
+    // Transform orders into debit transactions
+    debitOrders.forEach(order => {
+      const description = order.orderItems.map(item => item.name).join(', ');
+      transactions.push({
+        id: order._id,
+        type: 'debit',
+        amount: order.totalPrice,
+        status: order.paymentStatus === 'Paid' ? 'completed' : 'pending',
+        description: `Order #${order._id.toString().slice(-8).toUpperCase()} - ${description}`,
+        createdAt: order.createdAt,
+        orderId: order._id,
+        orderStatus: order.orderStatus
+      });
+    });
+    
+    // Sort all transactions by date (newest first)
+    transactions.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     res.status(200).json({
       success: true,
@@ -1253,3 +1291,4 @@ exports.getUsersByRole = async (req, res) => {
     });
   }
 };
+

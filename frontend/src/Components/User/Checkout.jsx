@@ -13,7 +13,8 @@ import {
   FiCheckCircle,
   FiPlus,
   FiMinus,
-  FiShoppingBag
+  FiShoppingBag,
+  FiUser
 } from 'react-icons/fi';
 import { MdWallet } from 'react-icons/md';
 
@@ -40,6 +41,7 @@ const Checkout = () => {
   });
   const [user, setUser] = useState(null);
   const [farmerLocation, setFarmerLocation] = useState(null);
+  const [farmerPayments, setFarmerPayments] = useState([]);
 
   const token = localStorage.getItem('token');
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001';
@@ -71,6 +73,9 @@ const Checkout = () => {
           setShippingDistance(5);
           setShippingCost(5 * RATE_PER_KM);
         }
+        
+        // Calculate farmer payments for display
+        calculateFarmerPayments(state.cartItems);
       } else if (state.product) {
         console.log('📦 Solo product from state:', state.product);
         
@@ -91,11 +96,9 @@ const Checkout = () => {
               setSingleProduct({
                 ...fullProduct,
                 quantity: 1,
-                // Make sure stock is available
                 stock: fullProduct.quantity || fullProduct.stock || 0
               });
             } else {
-              // Fallback to state product if API fails
               setSingleProduct({
                 ...state.product,
                 quantity: 1,
@@ -103,7 +106,6 @@ const Checkout = () => {
               });
             }
           } else {
-            // Fallback
             setSingleProduct({
               ...state.product,
               quantity: 1,
@@ -112,7 +114,6 @@ const Checkout = () => {
           }
         } catch (error) {
           console.error('❌ Error fetching product details:', error);
-          // Fallback to state product
           setSingleProduct({
             ...state.product,
             quantity: 1,
@@ -131,6 +132,15 @@ const Checkout = () => {
           setShippingDistance(5);
           setShippingCost(5 * RATE_PER_KM);
         }
+        
+        // Calculate farmer payment for solo product
+        if (state.product) {
+          setFarmerPayments([{
+            farmerName: state.product.farmerName || 'Unknown Farmer',
+            amount: state.product.price * 1, // quantity will be adjusted
+            productName: state.product.name
+          }]);
+        }
       } else {
         toast.error('No items to checkout');
         navigate('/cart');
@@ -139,6 +149,31 @@ const Checkout = () => {
 
     fetchData();
   }, [location]);
+
+  const calculateFarmerPayments = (items) => {
+    const farmerMap = {};
+    items.forEach(item => {
+      const farmerId = item.farmerId || item.farmer || 'unknown';
+      const farmerName = item.farmerName || 'Unknown Farmer';
+      const itemTotal = item.price * (item.quantity || 1);
+      
+      if (!farmerMap[farmerId]) {
+        farmerMap[farmerId] = {
+          farmerName: farmerName,
+          amount: 0,
+          items: []
+        };
+      }
+      farmerMap[farmerId].amount += itemTotal;
+      farmerMap[farmerId].items.push({
+        name: item.name,
+        quantity: item.quantity || 1,
+        price: item.price
+      });
+    });
+    
+    setFarmerPayments(Object.values(farmerMap));
+  };
 
   const fetchUserData = async () => {
     try {
@@ -207,7 +242,6 @@ const Checkout = () => {
     }
     
     const currentQty = singleProduct.quantity || 1;
-    // Use the correct stock field
     const maxStock = singleProduct.stock || singleProduct.quantity || 0;
     console.log(`📊 Current: ${currentQty}, Max Stock: ${maxStock}`);
     console.log('📦 Product data:', singleProduct);
@@ -229,6 +263,15 @@ const Checkout = () => {
       ...singleProduct,
       quantity: newQty
     });
+    
+    // Update farmer payment for solo product
+    if (singleProduct) {
+      setFarmerPayments([{
+        farmerName: singleProduct.farmerName || 'Unknown Farmer',
+        amount: singleProduct.price * newQty,
+        productName: singleProduct.name
+      }]);
+    }
   };
 
   const decrementQuantity = () => {
@@ -253,6 +296,15 @@ const Checkout = () => {
       ...singleProduct,
       quantity: newQty
     });
+    
+    // Update farmer payment for solo product
+    if (singleProduct) {
+      setFarmerPayments([{
+        farmerName: singleProduct.farmerName || 'Unknown Farmer',
+        amount: singleProduct.price * newQty,
+        productName: singleProduct.name
+      }]);
+    }
   };
 
   // ========== QUANTITY MANAGEMENT FOR CART ITEMS ==========
@@ -275,6 +327,9 @@ const Checkout = () => {
       quantity: currentQty + 1
     };
     setCartItems(updatedItems);
+    
+    // Recalculate farmer payments
+    calculateFarmerPayments(updatedItems);
   };
 
   const decrementCartQuantity = (index) => {
@@ -295,12 +350,16 @@ const Checkout = () => {
       quantity: currentQty - 1
     };
     setCartItems(updatedItems);
+    
+    // Recalculate farmer payments
+    calculateFarmerPayments(updatedItems);
   };
 
   // ========== REMOVE ITEM FROM CART ==========
   const removeCartItem = (index) => {
     const updatedItems = cartItems.filter((_, i) => i !== index);
     setCartItems(updatedItems);
+    calculateFarmerPayments(updatedItems);
     if (updatedItems.length === 0) {
       toast.info('Cart is empty');
       navigate('/cart');
@@ -382,13 +441,21 @@ const Checkout = () => {
       console.log('✅ Order response:', response.data);
 
       if (response.data.success) {
-        toast.success('Order placed successfully!');
+        // Show success message with farmer payment info if wallet was used
+        if (selectedPaymentMethod === 'Wallet' && response.data.farmerPayments) {
+          const farmerNames = response.data.farmerPayments.map(fp => fp.farmerName).join(', ');
+          toast.success(`✅ Order placed! Payments sent to: ${farmerNames}`);
+        } else {
+          toast.success('Order placed successfully!');
+        }
+        
         navigate('/checkout/confirmation', {
           state: { 
             orderId: response.data.order._id,
             paymentMethod: selectedPaymentMethod,
             shippingDistance: shippingDistance,
-            shippingCost: shippingCost
+            shippingCost: shippingCost,
+            farmerPayments: response.data.farmerPayments
           }
         });
       }
@@ -516,6 +583,31 @@ const Checkout = () => {
               </div>
             </div>
 
+            {/* Farmer Payment Breakdown - Show when Wallet is selected */}
+            {selectedPaymentMethod === 'Wallet' && farmerPayments.length > 0 && (
+              <div className="bg-green-50 rounded-xl border border-green-200 p-4">
+                <h3 className="text-sm font-semibold text-green-800 mb-2 flex items-center gap-2">
+                  <FiUser className="text-green-600" />
+                  Payment to Farmers
+                </h3>
+                <div className="space-y-2">
+                  {farmerPayments.map((payment, index) => (
+                    <div key={index} className="flex justify-between items-center text-sm">
+                      <span className="text-green-700">{payment.farmerName}</span>
+                      <span className="font-semibold text-green-800">₱{payment.amount.toFixed(2)}</span>
+                    </div>
+                  ))}
+                  <div className="border-t border-green-200 pt-2 mt-2 flex justify-between items-center">
+                    <span className="text-sm font-medium text-green-800">Total to Farmers</span>
+                    <span className="font-bold text-green-800">₱{farmerPayments.reduce((sum, p) => sum + p.amount, 0).toFixed(2)}</span>
+                  </div>
+                </div>
+                <p className="text-xs text-green-600 mt-2">
+                  💰 This amount will be sent directly to the farmers' wallets
+                </p>
+              </div>
+            )}
+
             {/* Shipping Address */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
               <h2 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
@@ -639,6 +731,11 @@ const Checkout = () => {
                   <div className="flex-1 text-left">
                     <p className="text-sm font-medium text-gray-800">Wallet</p>
                     <p className="text-xs text-gray-500">Balance: ₱{walletBalance.toFixed(2)}</p>
+                    {selectedPaymentMethod === 'Wallet' && farmerPayments.length > 0 && (
+                      <p className="text-xs text-green-600 mt-1">
+                        Will pay farmers directly
+                      </p>
+                    )}
                   </div>
                   {selectedPaymentMethod === 'Wallet' && (
                     <FiCheckCircle className="text-green-500" />
@@ -662,7 +759,7 @@ const Checkout = () => {
               )}
             </div>
 
-            {/* Place Order Button - Updated */}
+            {/* Place Order Button */}
             <button
               onClick={handlePlaceOrder}
               disabled={loading || (isCartCheckout && cartItems.length === 0)}
