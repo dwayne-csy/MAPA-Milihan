@@ -1,728 +1,553 @@
-// Mapa-Milihan/frontend/src/Components/User/Checkout.jsx
+// frontend/src/Components/User/Checkout.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import axios from 'axios';
+import { toast } from 'react-toastify';
 import UserHeader from '../layouts/Header';
-import { getUnitLabel } from '../utils/unitHelpers';
-
-// ── Helper: Check if URL is video ─────────────────────────────────────
-const isVideoUrl = (url) => {
-  if (!url) return false;
-  const videoExtensions = ['.mp4', '.webm', '.mov', '.avi', '.mpeg', '.ogg', '.3gpp', '.flv', '.wmv'];
-  const videoMimeTypes = ['video/mp4', 'video/webm', 'video/quicktime'];
-  
-  if (videoExtensions.some(ext => url.toLowerCase().includes(ext))) return true;
-  if (videoMimeTypes.some(mime => url.toLowerCase().includes(mime))) return true;
-  if (url.includes('/video/upload/')) return true;
-  
-  return false;
-};
-
-// ── Icons ───────────────────────────────────────────────────────────────
-const ArrowLeftIcon = ({ size = 20 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M19 12H5M12 19l-7-7 7-7"/>
-  </svg>
-);
-
-const XIcon = ({ size = 20 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="18" y1="6" x2="6" y2="18"/>
-    <line x1="6" y1="6" x2="18" y2="18"/>
-  </svg>
-);
-
-const PlusIcon = ({ size = 20 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="12" y1="5" x2="12" y2="19"/>
-    <line x1="5" y1="12" x2="19" y2="12"/>
-  </svg>
-);
-
-const MinusIcon = ({ size = 20 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="5" y1="12" x2="19" y2="12"/>
-  </svg>
-);
+import { 
+  FiArrowLeft, 
+  FiMapPin, 
+  FiCreditCard, 
+  FiDollarSign, 
+  FiTruck, 
+  FiCheckCircle,
+  FiPlus,
+  FiMinus
+} from 'react-icons/fi';
+import { MdWallet } from 'react-icons/md';
 
 const Checkout = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [order, setOrder] = useState(null);
-  const [cartData, setCartData] = useState(null);
-  const [isSoloCheckout, setIsSoloCheckout] = useState(false);
-  const [soloProduct, setSoloProduct] = useState(null);
-  const [soloQuantity, setSoloQuantity] = useState(1);
-  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [cartItems, setCartItems] = useState([]);
+  const [singleProduct, setSingleProduct] = useState(null);
+  const [isCartCheckout, setIsCartCheckout] = useState(false);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('COD');
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [shippingDistance, setShippingDistance] = useState(0);
+  const [shippingCost, setShippingCost] = useState(0);
+  const [address, setAddress] = useState({
+    city: '',
+    barangay: '',
+    street: '',
+    zipcode: '',
+    location: {
+      lat: null,
+      lng: null
+    }
+  });
+  const [user, setUser] = useState(null);
 
+  const token = localStorage.getItem('token');
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001';
 
+  const RATE_PER_KM = 40;
+
   useEffect(() => {
-    // Check if it's a solo checkout
-    if (location.state?.isSoloCheckout && location.state?.product) {
-      setIsSoloCheckout(true);
-      setSoloProduct(location.state.product);
-      setSoloQuantity(location.state.quantity || 1);
-    } else if (location.state?.cart) {
-      setCartData(location.state.cart);
-    } else {
-      // If no data, redirect to cart
-      navigate('/cart');
-    }
-  }, [location, navigate]);
-
-  // ── Quantity Handlers ──
-  const handleIncreaseQuantity = () => {
-    if (isSoloCheckout && soloProduct) {
-      const maxQuantity = soloProduct.stock || 99;
-      if (soloQuantity < maxQuantity) {
-        setSoloQuantity(prev => prev + 1);
+    const fetchData = async () => {
+      await fetchUserData();
+      await fetchWalletBalance();
+      
+      const state = location.state || {};
+      
+      if (state.cartItems && state.cartItems.length > 0) {
+        setCartItems(state.cartItems);
+        setIsCartCheckout(true);
+        if (state.shippingAddress) {
+          setAddress(state.shippingAddress);
+        }
+        setShippingDistance(5);
+        setShippingCost(5 * RATE_PER_KM);
+      } else if (state.product) {
+        // FIXED: Set quantity to 1 instead of using product's stock
+        setSingleProduct({
+          ...state.product,
+          quantity: 1 // Always start with 1
+        });
+        setIsCartCheckout(false);
+        setShippingDistance(5);
+        setShippingCost(5 * RATE_PER_KM);
+      } else {
+        toast.error('No items to checkout');
+        navigate('/cart');
       }
-    }
-  };
+    };
 
-  const handleDecreaseQuantity = () => {
-    if (isSoloCheckout && soloProduct) {
-      if (soloQuantity > 1) {
-        setSoloQuantity(prev => prev - 1);
-      }
-    }
-  };
+    fetchData();
+  }, [location]);
 
-  const handleQuantityChange = (e) => {
-    if (isSoloCheckout && soloProduct) {
-      const value = parseInt(e.target.value);
-      if (!isNaN(value) && value >= 1) {
-        const maxQuantity = soloProduct.stock || 99;
-        if (value <= maxQuantity) {
-          setSoloQuantity(value);
+  const fetchUserData = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/v1/users/me`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.data.user) {
+        setUser(response.data.user);
+        if (response.data.user.address) {
+          setAddress(prev => ({
+            ...prev,
+            ...response.data.user.address
+          }));
         }
       }
+    } catch (error) {
+      console.error('Error fetching user data:', error);
     }
+  };
+
+  const fetchWalletBalance = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/v1/users/wallet/balance`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.data.success) {
+        setWalletBalance(response.data.walletBalance);
+      }
+    } catch (error) {
+      console.error('Error fetching wallet balance:', error);
+    }
+  };
+
+  // ========== QUANTITY MANAGEMENT FOR SOLO PRODUCT ==========
+  const handleQuantityChange = (newQuantity) => {
+    if (!singleProduct) return;
+    
+    // Ensure quantity is within valid range
+    if (newQuantity < 1) {
+      toast.error('Quantity cannot be less than 1');
+      return;
+    }
+    
+    // Use the product's available stock (not the current quantity)
+    const maxStock = singleProduct.stock || singleProduct.quantity || 0;
+    if (newQuantity > maxStock) {
+      toast.error(`Only ${maxStock} items available`);
+      return;
+    }
+    
+    setSingleProduct({
+      ...singleProduct,
+      quantity: newQuantity
+    });
+  };
+
+  const incrementQuantity = () => {
+    if (!singleProduct) return;
+    handleQuantityChange((singleProduct.quantity || 1) + 1);
+  };
+
+  const decrementQuantity = () => {
+    if (!singleProduct) return;
+    handleQuantityChange((singleProduct.quantity || 1) - 1);
+  };
+
+  // ========== QUANTITY MANAGEMENT FOR CART ITEMS ==========
+  const handleCartQuantityChange = (index, newQuantity) => {
+    if (newQuantity < 1) {
+      toast.error('Quantity cannot be less than 1');
+      return;
+    }
+    
+    const item = cartItems[index];
+    const maxStock = item.stock || item.availableQuantity || 999;
+    if (newQuantity > maxStock) {
+      toast.error(`Only ${maxStock} items available`);
+      return;
+    }
+    
+    const updatedItems = [...cartItems];
+    updatedItems[index] = {
+      ...updatedItems[index],
+      quantity: newQuantity
+    };
+    setCartItems(updatedItems);
+  };
+
+  const incrementCartQuantity = (index) => {
+    const currentQuantity = cartItems[index].quantity || 1;
+    handleCartQuantityChange(index, currentQuantity + 1);
+  };
+
+  const decrementCartQuantity = (index) => {
+    const currentQuantity = cartItems[index].quantity || 1;
+    handleCartQuantityChange(index, currentQuantity - 1);
+  };
+
+  // ========== REMOVE ITEM FROM CART ==========
+  const removeCartItem = (index) => {
+    const updatedItems = cartItems.filter((_, i) => i !== index);
+    setCartItems(updatedItems);
+    if (updatedItems.length === 0) {
+      toast.info('Cart is empty');
+      navigate('/cart');
+    }
+  };
+
+  const getSubtotal = () => {
+    if (isCartCheckout) {
+      return cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
+    } else if (singleProduct) {
+      return singleProduct.price * (singleProduct.quantity || 1);
+    }
+    return 0;
+  };
+
+  const getTotal = () => {
+    return getSubtotal() + shippingCost;
   };
 
   const handlePlaceOrder = async () => {
+    // Validate address fields
+    if (!address.city || !address.barangay || !address.street || !address.zipcode) {
+      toast.error('Please fill in all address fields');
+      return;
+    }
+
+    if (!selectedPaymentMethod) {
+      toast.error('Please select a payment method');
+      return;
+    }
+
+    // Check if cart is empty
+    if (isCartCheckout && cartItems.length === 0) {
+      toast.error('Your cart is empty');
+      return;
+    }
+
+    // Check if single product quantity is valid
+    if (!isCartCheckout && (!singleProduct || singleProduct.quantity < 1)) {
+      toast.error('Invalid product quantity');
+      return;
+    }
+
+    // Check wallet balance if wallet payment is selected
+    if (selectedPaymentMethod === 'Wallet' && walletBalance < getTotal()) {
+      toast.error(`Insufficient wallet balance. Available: ₱${walletBalance.toFixed(2)}, Required: ₱${getTotal().toFixed(2)}`);
+      return;
+    }
+
     setLoading(true);
-    setError('');
 
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        navigate('/login');
-        return;
+      let endpoint = '';
+      let payload = {};
+
+      if (isCartCheckout) {
+        endpoint = `${API_BASE_URL}/api/v1/orders/checkout`;
+        payload = {
+          paymentMethod: selectedPaymentMethod,
+          address: address
+        };
+      } else {
+        endpoint = `${API_BASE_URL}/api/v1/orders/checkout/solo`;
+        payload = {
+          productId: singleProduct.productId || singleProduct._id,
+          quantity: singleProduct.quantity || 1,
+          paymentMethod: selectedPaymentMethod,
+          address: address
+        };
       }
 
-      let response;
-      let url;
+      console.log('📤 Sending order payload:', payload);
+      console.log('📤 Endpoint:', endpoint);
 
-      if (isSoloCheckout) {
-        // Solo checkout
-        url = `${API_BASE_URL}/api/v1/checkout/solo`;
-        response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ 
-            productId: soloProduct._id, 
-            quantity: soloQuantity 
-          })
-        });
-      } else {
-        // Regular cart checkout
-        url = `${API_BASE_URL}/api/v1/checkout`;
-        response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+      const response = await axios.post(endpoint, payload, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      console.log('✅ Order response:', response.data);
+
+      if (response.data.success) {
+        toast.success('Order placed successfully!');
+        navigate('/orders', { 
+          state: { 
+            orderId: response.data.order._id,
+            paymentMethod: selectedPaymentMethod
           }
         });
       }
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setOrder(data.order);
-        // Navigate to confirmation page
-        navigate('/checkout/confirmation', { 
-          state: { order: data.order } 
-        });
+    } catch (error) {
+      console.error('❌ Error placing order:', error);
+      console.error('❌ Error response:', error.response?.data);
+      if (error.response?.data?.message) {
+        toast.error(error.response.data.message);
       } else {
-        setError(data.message || 'Failed to place order');
+        toast.error('Failed to place order. Please try again.');
       }
-    } catch (err) {
-      console.error('Checkout error:', err);
-      setError('Network error. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCancel = () => {
-    setShowCancelConfirm(true);
-  };
-
-  const confirmCancel = () => {
-    setShowCancelConfirm(false);
-    // Navigate back to the appropriate page
-    if (isSoloCheckout) {
-      navigate('/products');
-    } else {
-      navigate('/cart');
-    }
-  };
-
-  const handleBack = () => {
-    if (isSoloCheckout) {
-      navigate('/products');
-    } else {
-      navigate('/cart');
-    }
-  };
-
-  // Helper function to get product image
-  const getProductImage = (product) => {
-    if (!product) return null;
-    
-    // Check if product has images array
-    if (product.images && product.images.length > 0) {
-      const image = product.images[0];
-      if (image.url) {
-        // Check if it's a video
-        if (isVideoUrl(image.url)) {
-          return null; // Will show video icon instead
-        }
-        return image.url.startsWith('http') ? image.url : `${API_BASE_URL}${image.url}`;
-      }
-    }
-    return null;
-  };
-
-  // Helper function to check if product has video
-  const hasVideo = (product) => {
-    if (!product || !product.images) return false;
-    return product.images.some(img => isVideoUrl(img.url));
-  };
-
-  // Helper function to get video count
-  const getVideoCount = (product) => {
-    if (!product || !product.images) return 0;
-    return product.images.filter(img => isVideoUrl(img.url)).length;
-  };
-
-  // Loading state
-  if (!cartData && !soloProduct) {
-    return (
-      <div className="full-bleed w-full min-h-screen bg-gray-50 flex flex-col">
-        <UserHeader />
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-gray-600">Loading checkout...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Calculate totals for display
-  let items = [];
-  let subtotal = 0;
-  const TAX_RATE = 0.12;
-  const SHIPPING_PRICE = 50;
-
-  if (isSoloCheckout && soloProduct) {
-    const itemTotal = soloProduct.price * soloQuantity;
-    items = [{
-      product: soloProduct,
-      quantity: soloQuantity,
-      total: itemTotal
-    }];
-    subtotal = itemTotal;
-  } else if (cartData) {
-    items = cartData.items.map(item => ({
-      product: item.product,
-      quantity: item.quantity,
-      total: item.product.price * item.quantity
-    }));
-    subtotal = cartData.totalPrice;
-  }
-
-  const tax = subtotal * TAX_RATE;
-  const total = subtotal + tax + SHIPPING_PRICE;
-
-  // Get back button label
-  const backLabel = isSoloCheckout ? 'Back to Products' : 'Back to Cart';
-
   return (
     <div className="full-bleed w-full min-h-screen bg-gray-50 flex flex-col">
       <UserHeader />
-      
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        
-        @keyframes slideIn {
-          from { opacity: 0; transform: translateX(20px); }
-          to { opacity: 1; transform: translateX(0); }
-        }
-        
-        .checkout-item {
-          animation: fadeIn 0.3s ease both;
-        }
-        
-        .checkout-item:nth-child(1) { animation-delay: 0.05s; }
-        .checkout-item:nth-child(2) { animation-delay: 0.1s; }
-        .checkout-item:nth-child(3) { animation-delay: 0.15s; }
-        .checkout-item:nth-child(4) { animation-delay: 0.2s; }
-        .checkout-item:nth-child(5) { animation-delay: 0.25s; }
 
-        .cancel-confirm-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(0, 0, 0, 0.5);
-          backdrop-filter: blur(4px);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 9999;
-          animation: fadeIn 0.2s ease;
-        }
-
-        .cancel-confirm-modal {
-          background: white;
-          border-radius: 16px;
-          padding: 32px;
-          max-width: 400px;
-          width: 90%;
-          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
-          animation: slideIn 0.3s ease;
-        }
-
-        .cancel-confirm-modal h3 {
-          font-family: 'DM Serif Display', serif;
-          font-size: 1.3rem;
-          color: #1a3d2b;
-          margin: 0 0 8px;
-        }
-
-        .cancel-confirm-modal p {
-          color: #78909c;
-          font-size: 0.95rem;
-          margin: 0 0 20px;
-        }
-
-        .cancel-confirm-actions {
-          display: flex;
-          gap: 12px;
-        }
-
-        .cancel-confirm-actions button {
-          flex: 1;
-          padding: 10px 16px;
-          border: none;
-          border-radius: 8px;
-          font-family: 'DM Sans', sans-serif;
-          font-size: 0.9rem;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-
-        .cancel-confirm-actions .confirm-btn {
-          background: #ef5350;
-          color: white;
-        }
-
-        .cancel-confirm-actions .confirm-btn:hover {
-          background: #c62828;
-        }
-
-        .cancel-confirm-actions .cancel-btn {
-          background: #e8f5e9;
-          color: #2E7D32;
-        }
-
-        .cancel-confirm-actions .cancel-btn:hover {
-          background: #c8e6c9;
-        }
-
-        .checkout-actions {
-          display: flex;
-          gap: 12px;
-          margin-top: 16px;
-        }
-
-        .checkout-actions .place-order-btn {
-          flex: 2;
-          padding: 14px;
-          background: linear-gradient(135deg, #2E7D32, #43A047);
-          color: #fff;
-          border: none;
-          border-radius: 10px;
-          font-family: 'DM Sans', sans-serif;
-          font-size: 1rem;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-        }
-
-        .checkout-actions .place-order-btn:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 20px rgba(46, 125, 50, 0.3);
-        }
-
-        .checkout-actions .place-order-btn:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-          transform: none;
-        }
-
-        .checkout-actions .cancel-order-btn {
-          flex: 1;
-          padding: 14px 20px;
-          border: 1.5px solid #ffebee;
-          border-radius: 10px;
-          background: #fff;
-          color: #c62828;
-          font-family: 'DM Sans', sans-serif;
-          font-size: 0.95rem;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 6px;
-        }
-
-        .checkout-actions .cancel-order-btn:hover {
-          background: #ffebee;
-          border-color: #ef5350;
-        }
-
-        .back-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          padding: 8px 16px;
-          background: #fff;
-          border: 1.5px solid #e0e7e0;
-          border-radius: 8px;
-          font-family: 'DM Sans', sans-serif;
-          font-size: 0.85rem;
-          color: #546e7a;
-          cursor: pointer;
-          transition: all 0.2s;
-          margin-bottom: 16px;
-        }
-
-        .back-btn:hover {
-          border-color: #66BB6A;
-          color: #2E7D32;
-        }
-
-        /* ── Quantity Controls ── */
-        .quantity-controls {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          margin-top: 4px;
-        }
-
-        .quantity-btn {
-          width: 28px;
-          height: 28px;
-          border: 1.5px solid #e0e7e0;
-          border-radius: 6px;
-          background: #f8faf8;
-          color: #2d3748;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transition: all 0.2s;
-          font-size: 1rem;
-          font-weight: 600;
-          padding: 0;
-        }
-
-        .quantity-btn:hover:not(:disabled) {
-          background: #e8f5e9;
-          border-color: #66BB6A;
-          color: #2E7D32;
-        }
-
-        .quantity-btn:disabled {
-          opacity: 0.3;
-          cursor: not-allowed;
-        }
-
-        .quantity-input {
-          width: 48px;
-          height: 28px;
-          text-align: center;
-          border: 1.5px solid #e0e7e0;
-          border-radius: 6px;
-          font-size: 0.9rem;
-          font-weight: 500;
-          color: #2d3748;
-          background: white;
-          outline: none;
-          transition: border-color 0.2s;
-        }
-
-        .quantity-input:focus {
-          border-color: #66BB6A;
-        }
-
-        .quantity-input::-webkit-inner-spin-button,
-        .quantity-input::-webkit-outer-spin-button {
-          -webkit-appearance: none;
-          margin: 0;
-        }
-
-        .quantity-input {
-          -moz-appearance: textfield;
-        }
-
-        .stock-info {
-          font-size: 0.7rem;
-          color: #94a3b8;
-          margin-top: 2px;
-        }
-
-        @media (max-width: 640px) {
-          .checkout-actions {
-            flex-direction: column-reverse;
-          }
-          .checkout-actions .place-order-btn,
-          .checkout-actions .cancel-order-btn {
-            flex: 1;
-          }
-          
-          .quantity-controls {
-            gap: 6px;
-          }
-          
-          .quantity-btn {
-            width: 24px;
-            height: 24px;
-          }
-          
-          .quantity-input {
-            width: 40px;
-            height: 24px;
-            font-size: 0.8rem;
-          }
-        }
-      `}</style>
-
-      <div className="flex-1 max-w-4xl mx-auto w-full p-4 md:p-6">
-        {/* ── Back Button ── */}
-        <button onClick={handleBack} className="back-btn">
-          <ArrowLeftIcon size={16} /> {backLabel}
+      <div className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full">
+        <button 
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-4 transition-colors"
+        >
+          <FiArrowLeft size={20} />
+          <span className="text-sm font-medium">Back</span>
         </button>
 
         <h1 className="text-2xl font-bold text-gray-800 mb-6">Checkout</h1>
-        
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
-            ⚠️ {error}
-          </div>
-        )}
 
-        {/* ── Order Summary ── */}
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <h2 className="text-lg font-semibold mb-4">Order Summary</h2>
-          
-          {items.map((item) => {
-            const imageUrl = getProductImage(item.product);
-            const hasVideoMedia = hasVideo(item.product);
-            const videoCount = getVideoCount(item.product);
-            
-            return (
-              <div key={item.product._id} className="checkout-item flex items-center gap-4 py-3 border-b last:border-b-0">
-                <div className="w-16 h-16 bg-gray-100 rounded overflow-hidden flex-shrink-0">
-                  {imageUrl ? (
-                    <img 
-                      src={imageUrl} 
-                      alt={item.product.name}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.target.style.display = 'none';
-                        e.target.parentElement.innerHTML = `
-                          <div style="display:flex;align-items:center;justify-content:center;height:100%;color:#a5b8a5;font-size:0.6rem;background:#f5f7f5;">
-                            No Image
-                          </div>
-                        `;
-                      }}
-                    />
-                  ) : hasVideoMedia ? (
-                    <div style={{ 
-                      display: 'flex', 
-                      flexDirection: 'column',
-                      alignItems: 'center', 
-                      justifyContent: 'center',
-                      height: '100%',
-                      background: '#1a1a2e',
-                      color: 'white'
-                    }}>
-                      <span style={{ fontSize: '1.5rem' }}>🎬</span>
-                      <span style={{ fontSize: '0.5rem', marginTop: '2px', opacity: 0.7 }}>
-                        {videoCount} Video{videoCount > 1 ? 's' : ''}
-                      </span>
-                    </div>
-                  ) : (
-                    <div style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center',
-                      height: '100%',
-                      color: '#a5b8a5',
-                      fontSize: '0.6rem',
-                      background: '#f5f7f5'
-                    }}>
-                      No Image
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium">{item.product.name}</p>
-                  
-                  {/* ── Quantity Controls (only for solo checkout) ── */}
-                  {isSoloCheckout && soloProduct && (
-                    <div className="quantity-controls">
-                      <button 
-                        className="quantity-btn"
-                        onClick={handleDecreaseQuantity}
-                        disabled={soloQuantity <= 1}
-                        aria-label="Decrease quantity"
-                      >
-                        <MinusIcon size={14} />
-                      </button>
-                      <input
-                        type="number"
-                        className="quantity-input"
-                        value={soloQuantity}
-                        onChange={handleQuantityChange}
-                        min="1"
-                        max={soloProduct.stock || 99}
-                        aria-label="Quantity"
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column - Order Summary */}
+          <div className="lg:col-span-2 space-y-4">
+            {/* Order Items */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+              <h2 className="text-sm font-semibold text-gray-800 mb-3">Order Summary</h2>
+              <div className="space-y-3">
+                {isCartCheckout ? (
+                  cartItems.map((item, index) => (
+                    <div key={index} className="flex items-center gap-3 pb-3 border-b border-gray-100 last:border-0">
+                      <img 
+                        src={item.image || item.images?.[0]?.url || '/default-product.png'} 
+                        alt={item.name}
+                        className="w-16 h-16 object-cover rounded-lg"
                       />
-                      <button 
-                        className="quantity-btn"
-                        onClick={handleIncreaseQuantity}
-                        disabled={soloQuantity >= (soloProduct.stock || 99)}
-                        aria-label="Increase quantity"
+                      <div className="flex-1">
+                        <h3 className="text-sm font-medium text-gray-800">{item.name}</h3>
+                        <div className="flex items-center gap-2 mt-1">
+                          {/* Quantity Controls for Cart Items */}
+                          <div className="flex items-center gap-1 border border-gray-200 rounded-lg">
+                            <button
+                              onClick={() => decrementCartQuantity(index)}
+                              className="p-1 hover:bg-gray-100 rounded-l-lg transition-colors"
+                              disabled={item.quantity <= 1}
+                            >
+                              <FiMinus size={14} className={item.quantity <= 1 ? 'text-gray-300' : 'text-gray-600'} />
+                            </button>
+                            <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
+                            <button
+                              onClick={() => incrementCartQuantity(index)}
+                              className="p-1 hover:bg-gray-100 rounded-r-lg transition-colors"
+                            >
+                              <FiPlus size={14} className="text-gray-600" />
+                            </button>
+                          </div>
+                          <span className="text-xs text-gray-400">
+                            Stock: {item.stock || item.availableQuantity || 'N/A'}
+                          </span>
+                        </div>
+                        <p className="text-sm font-semibold text-green-600 mt-1">
+                          ₱{(item.price * item.quantity).toFixed(2)}
+                        </p>
+                      </div>
+                      {/* Remove Button */}
+                      <button
+                        onClick={() => removeCartItem(index)}
+                        className="text-red-500 hover:text-red-700 text-sm font-medium"
                       >
-                        <PlusIcon size={14} />
+                        Remove
                       </button>
-                      {soloProduct.stock && (
-                        <span className="stock-info">
-                          Stock: {soloProduct.stock}
-                        </span>
-                      )}
                     </div>
-                  )}
-                  
-                  {/* ── Show quantity for cart items (non-editable) ── */}
-                  {!isSoloCheckout && (
-                    <p className="text-sm text-gray-500">
-                      Quantity: {item.quantity}
-                    </p>
-                  )}
-                  
-                  <p className="text-sm text-gray-500">
-                    ₱{Number(item.product.price).toFixed(2)} per item
-                  </p>
-                  {item.product.unit && (
-                    <p className="text-xs text-gray-400">Unit: {item.product.unit}</p>
-                  )}
-                </div>
-                <p className="font-semibold text-emerald-600">₱{item.total.toFixed(2)}</p>
+                  ))
+                ) : singleProduct && (
+                  <div className="flex items-center gap-3">
+                    <img 
+                      src={singleProduct.images?.[0]?.url || singleProduct.image || '/default-product.png'} 
+                      alt={singleProduct.name}
+                      className="w-16 h-16 object-cover rounded-lg"
+                    />
+                    <div className="flex-1">
+                      <h3 className="text-sm font-medium text-gray-800">{singleProduct.name}</h3>
+                      <div className="flex items-center gap-2 mt-1">
+                        {/* Quantity Controls for Solo Product */}
+                        <div className="flex items-center gap-1 border border-gray-200 rounded-lg">
+                          <button
+                            onClick={decrementQuantity}
+                            className="p-1 hover:bg-gray-100 rounded-l-lg transition-colors"
+                            disabled={singleProduct.quantity <= 1}
+                          >
+                            <FiMinus size={14} className={singleProduct.quantity <= 1 ? 'text-gray-300' : 'text-gray-600'} />
+                          </button>
+                          <span className="w-8 text-center text-sm font-medium">{singleProduct.quantity}</span>
+                          <button
+                            onClick={incrementQuantity}
+                            className="p-1 hover:bg-gray-100 rounded-r-lg transition-colors"
+                          >
+                            <FiPlus size={14} className="text-gray-600" />
+                          </button>
+                        </div>
+                        <span className="text-xs text-gray-400">
+                          Stock: {singleProduct.stock || singleProduct.availableQuantity || 'N/A'}
+                        </span>
+                      </div>
+                      <p className="text-sm font-semibold text-green-600 mt-1">
+                        ₱{(singleProduct.price * (singleProduct.quantity || 1)).toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
-            );
-          })}
-        </div>
+            </div>
 
-        {/* ── Total Summary ── */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Subtotal</span>
-              <span>₱{subtotal.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Shipping</span>
-              <span>₱{SHIPPING_PRICE.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Tax (12%)</span>
-              <span>₱{tax.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-lg font-bold pt-2 border-t">
-              <span>Total</span>
-              <span className="text-emerald-600">
-                ₱{total.toFixed(2)}
-              </span>
+            {/* Shipping Address */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+              <h2 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <FiMapPin className="text-green-500" />
+                Shipping Address
+              </h2>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-gray-500">City</label>
+                    <input
+                      type="text"
+                      value={address.city}
+                      onChange={(e) => setAddress({...address, city: e.target.value})}
+                      placeholder="Enter city"
+                      className="w-full p-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500">Barangay</label>
+                    <input
+                      type="text"
+                      value={address.barangay}
+                      onChange={(e) => setAddress({...address, barangay: e.target.value})}
+                      placeholder="Enter barangay"
+                      className="w-full p-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-gray-500">Street</label>
+                    <input
+                      type="text"
+                      value={address.street}
+                      onChange={(e) => setAddress({...address, street: e.target.value})}
+                      placeholder="Enter street"
+                      className="w-full p-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500">Zipcode</label>
+                    <input
+                      type="text"
+                      value={address.zipcode}
+                      onChange={(e) => setAddress({...address, zipcode: e.target.value})}
+                      placeholder="Enter zipcode"
+                      className="w-full p-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* ── Action Buttons ── */}
-          <div className="checkout-actions">
+          {/* Right Column - Payment & Summary */}
+          <div className="space-y-4">
+            {/* Order Total */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+              <h2 className="text-sm font-semibold text-gray-800 mb-3">Order Total</h2>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Subtotal</span>
+                  <span className="font-medium">₱{getSubtotal().toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600 flex items-center gap-1">
+                    <FiTruck className="text-green-500" />
+                    Shipping Fee
+                    <span className="text-xs text-gray-400">(₱{RATE_PER_KM}/km)</span>
+                  </span>
+                  <span className="font-medium">₱{shippingCost.toFixed(2)}</span>
+                </div>
+                {shippingDistance > 0 && (
+                  <div className="text-xs text-gray-400 text-right">
+                    Distance: {shippingDistance.toFixed(2)} km
+                  </div>
+                )}
+                <div className="border-t border-gray-200 pt-2 mt-2">
+                  <div className="flex justify-between text-lg font-bold">
+                    <span>Total</span>
+                    <span className="text-green-600">₱{getTotal().toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Payment Method */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+              <h2 className="text-sm font-semibold text-gray-800 mb-3">Payment Method</h2>
+              <div className="space-y-2">
+                <button
+                  onClick={() => setSelectedPaymentMethod('COD')}
+                  className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-all ${
+                    selectedPaymentMethod === 'COD' 
+                      ? 'border-green-500 bg-green-50' 
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <FiCreditCard className={`text-lg ${selectedPaymentMethod === 'COD' ? 'text-green-500' : 'text-gray-400'}`} />
+                  <div className="flex-1 text-left">
+                    <p className="text-sm font-medium text-gray-800">Cash on Delivery</p>
+                    <p className="text-xs text-gray-500">Pay when you receive the order</p>
+                  </div>
+                  {selectedPaymentMethod === 'COD' && (
+                    <FiCheckCircle className="text-green-500" />
+                  )}
+                </button>
+
+                <button
+                  onClick={() => setSelectedPaymentMethod('Wallet')}
+                  className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-all ${
+                    selectedPaymentMethod === 'Wallet' 
+                      ? 'border-green-500 bg-green-50' 
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <MdWallet className={`text-lg ${selectedPaymentMethod === 'Wallet' ? 'text-green-500' : 'text-gray-400'}`} />
+                  <div className="flex-1 text-left">
+                    <p className="text-sm font-medium text-gray-800">Wallet</p>
+                    <p className="text-xs text-gray-500">Balance: ₱{walletBalance.toFixed(2)}</p>
+                  </div>
+                  {selectedPaymentMethod === 'Wallet' && (
+                    <FiCheckCircle className="text-green-500" />
+                  )}
+                </button>
+              </div>
+              
+              {selectedPaymentMethod === 'Wallet' && walletBalance < getTotal() && (
+                <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-xs text-red-600">
+                    Insufficient balance. Need ₱{(getTotal() - walletBalance).toFixed(2)} more.
+                    <button 
+                      onClick={() => navigate('/wallet')}
+                      className="ml-1 text-green-600 hover:underline font-medium"
+                    >
+                      Top up now
+                    </button>
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Place Order Button */}
             <button
-              className="cancel-order-btn"
-              onClick={handleCancel}
-            >
-              <XIcon size={18} /> Cancel Order
-            </button>
-            <button
-              className="place-order-btn"
               onClick={handlePlaceOrder}
-              disabled={loading}
+              disabled={loading || (isCartCheckout && cartItems.length === 0)}
+              className="w-full py-3 px-4 bg-green-500 text-white rounded-xl font-medium hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              {loading ? 'Placing Order...' : 'Place Order'}
+              {loading ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              ) : (
+                <>
+                  <FiDollarSign size={18} />
+                  Place Order
+                </>
+              )}
             </button>
           </div>
         </div>
       </div>
-
-      {/* ── Cancel Confirmation Modal ── */}
-      {showCancelConfirm && (
-        <div className="cancel-confirm-overlay" onClick={() => setShowCancelConfirm(false)}>
-          <div className="cancel-confirm-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Cancel Order?</h3>
-            <p>
-              Are you sure you want to cancel this order? 
-              Your cart will be preserved and you can continue shopping.
-            </p>
-            <div className="cancel-confirm-actions">
-              <button 
-                className="cancel-btn"
-                onClick={() => setShowCancelConfirm(false)}
-              >
-                Continue Checkout
-              </button>
-              <button 
-                className="confirm-btn"
-                onClick={confirmCancel}
-              >
-                Yes, Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

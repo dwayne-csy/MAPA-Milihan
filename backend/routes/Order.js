@@ -13,8 +13,8 @@ const { isAuthenticatedUser } = require('../middlewares/auth');
 // ── Order Routes ──
 router.post('/checkout', isAuthenticatedUser, checkout);
 router.post('/checkout/solo', isAuthenticatedUser, soloCheckout);
-router.get('/orders', isAuthenticatedUser, getUserOrders);
-router.get('/orders/:orderId', isAuthenticatedUser, getOrderDetails);
-router.put('/orders/:orderId/cancel', isAuthenticatedUser, cancelOrder);
+router.get('/my-orders', isAuthenticatedUser, getUserOrders);
+router.get('/my-orders/:orderId', isAuthenticatedUser, getOrderDetails);
+router.put('/:orderId/cancel', isAuthenticatedUser, cancelOrder);
 
 module.exports = router;

@@ -1202,3 +1202,44 @@ exports.getUsersByRole = async (req, res) => {
     });
   }
 };
+
+// ========== GET WALLET TRANSACTIONS ==========
+exports.getWalletTransactions = async (req, res) => {
+  try {
+    console.log('💰 Get wallet transactions request received');
+    const userId = req.user.id;
+    
+    // Get all orders where user used wallet
+    const Order = require('../models/Order');
+    const orders = await Order.find({
+      user: userId,
+      paymentMethod: 'Wallet'
+    }).sort({ createdAt: -1 });
+
+    // Transform orders into transaction format
+    const transactions = orders.map(order => ({
+      id: order._id,
+      type: 'debit',
+      amount: order.totalPrice,
+      status: order.paymentStatus === 'Paid' ? 'completed' : 'pending',
+      description: `Order #${order._id.toString().slice(-8).toUpperCase()} - ${order.orderItems.map(item => item.name).join(', ')}`,
+      createdAt: order.createdAt,
+      orderId: order._id,
+      orderStatus: order.orderStatus
+    }));
+
+    // If no transactions, return empty array
+    res.status(200).json({
+      success: true,
+      transactions: transactions,
+      count: transactions.length
+    });
+
+  } catch (error) {
+    console.error('❌ GET WALLET TRANSACTIONS ERROR:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to fetch transactions'
+    });
+  }
+};

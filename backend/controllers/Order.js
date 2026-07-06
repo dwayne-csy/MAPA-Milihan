@@ -8,7 +8,9 @@ const Product = require('../models/Product');
 exports.checkout = async (req, res) => {
   try {
     console.log('🛒 Checkout request received');
+    console.log('📦 Request body:', req.body);
     const userId = req.user.id;
+    const { paymentMethod = 'Cash on Delivery', address: providedAddress } = req.body;
 
     // Fetch user
     const user = await User.findById(userId);
@@ -43,7 +45,6 @@ exports.checkout = async (req, res) => {
     for (const item of cart.items) {
       const product = item.product;
       
-      // Check if product exists and is available
       if (!product || product.isDeleted || !product.isAvailable) {
         return res.status(400).json({
           success: false,
@@ -51,7 +52,6 @@ exports.checkout = async (req, res) => {
         });
       }
 
-      // Check stock
       if (product.quantity < item.quantity) {
         return res.status(400).json({
           success: false,
@@ -59,7 +59,6 @@ exports.checkout = async (req, res) => {
         });
       }
 
-      // Add to order items
       orderItems.push({
         product: product._id,
         name: product.name,
@@ -81,16 +80,57 @@ exports.checkout = async (req, res) => {
     const taxPrice = itemsPrice * TAX_RATE;
     const totalPrice = itemsPrice + taxPrice + SHIPPING_PRICE;
 
-    // Create shipping info from user address
-    const shippingInfo = {
-      address: `${user.address.street || ''}, ${user.address.barangay || ''}, ${user.address.city || ''}`,
-      city: user.address.city || '',
-      barangay: user.address.barangay || '',
-      street: user.address.street || '',
-      zipcode: user.address.zipcode || '',
-      phoneNo: user.contact || '',
-      country: 'Philippines'
-    };
+    // Handle wallet payment
+    let paymentStatus = 'Pending';
+    let paymentDetails = {};
+
+    if (paymentMethod === 'Wallet') {
+      // Check if user has sufficient balance
+      if (user.walletBalance < totalPrice) {
+        return res.status(400).json({
+          success: false,
+          message: `Insufficient wallet balance. Available: ₱${user.walletBalance.toFixed(2)}, Required: ₱${totalPrice.toFixed(2)}`
+        });
+      }
+
+      // Deduct from wallet
+      const previousBalance = user.walletBalance;
+      await user.deductWalletBalance(totalPrice);
+      
+      paymentStatus = 'Paid';
+      paymentDetails = {
+        paymentMethod: 'Wallet',
+        walletTransactionId: `WALLET-${Date.now()}`,
+        walletAmountUsed: totalPrice,
+        previousBalance: previousBalance,
+        newBalance: user.walletBalance,
+        paymentDate: new Date()
+      };
+    }
+
+    // Create shipping info from user address or provided address
+    let shippingInfo;
+    if (providedAddress && providedAddress.city && providedAddress.barangay) {
+      shippingInfo = {
+        address: `${providedAddress.street || ''}, ${providedAddress.barangay || ''}, ${providedAddress.city || ''}`,
+        city: providedAddress.city || '',
+        barangay: providedAddress.barangay || '',
+        street: providedAddress.street || '',
+        zipcode: providedAddress.zipcode || '',
+        phoneNo: user.contact || '',
+        country: 'Philippines'
+      };
+    } else {
+      shippingInfo = {
+        address: `${user.address.street || ''}, ${user.address.barangay || ''}, ${user.address.city || ''}`,
+        city: user.address.city || '',
+        barangay: user.address.barangay || '',
+        street: user.address.street || '',
+        zipcode: user.address.zipcode || '',
+        phoneNo: user.contact || '',
+        country: 'Philippines'
+      };
+    }
 
     // Create order
     const order = await Order.create({
@@ -101,9 +141,10 @@ exports.checkout = async (req, res) => {
       taxPrice,
       shippingPrice: SHIPPING_PRICE,
       totalPrice,
-      paymentStatus: 'Pending',
+      paymentStatus,
+      paymentDetails,
       orderStatus: 'Processing',
-      paymentMethod: 'Cash on Delivery'
+      paymentMethod: paymentMethod === 'Wallet' ? 'Wallet' : 'Cash on Delivery'
     });
 
     // Decrease stock for each product
@@ -123,7 +164,7 @@ exports.checkout = async (req, res) => {
 
     // Populate order with user and product details
     const populatedOrder = await Order.findById(order._id)
-      .populate('user', 'name email contact')
+      .populate('user', 'name email contact walletBalance')
       .populate('orderItems.product', 'name price unit images');
 
     res.status(201).json({
@@ -145,9 +186,11 @@ exports.checkout = async (req, res) => {
 exports.soloCheckout = async (req, res) => {
   try {
     console.log('🛒 Solo checkout request received');
+    console.log('📦 Request body:', req.body);
     const userId = req.user.id;
-    const { productId, quantity = 1 } = req.body;
+    const { productId, quantity = 1, paymentMethod = 'Cash on Delivery', address: providedAddress } = req.body;
 
+    // Validate required fields
     if (!productId) {
       return res.status(400).json({
         success: false,
@@ -214,16 +257,59 @@ exports.soloCheckout = async (req, res) => {
     const taxPrice = itemsPrice * TAX_RATE;
     const totalPrice = itemsPrice + taxPrice + SHIPPING_PRICE;
 
-    // Create shipping info from user address
-    const shippingInfo = {
-      address: `${user.address.street || ''}, ${user.address.barangay || ''}, ${user.address.city || ''}`,
-      city: user.address.city || '',
-      barangay: user.address.barangay || '',
-      street: user.address.street || '',
-      zipcode: user.address.zipcode || '',
-      phoneNo: user.contact || '',
-      country: 'Philippines'
-    };
+    // Handle wallet payment
+    let paymentStatus = 'Pending';
+    let paymentDetails = {};
+
+    if (paymentMethod === 'Wallet') {
+      // Check if user has sufficient balance
+      if (user.walletBalance < totalPrice) {
+        return res.status(400).json({
+          success: false,
+          message: `Insufficient wallet balance. Available: ₱${user.walletBalance.toFixed(2)}, Required: ₱${totalPrice.toFixed(2)}`
+        });
+      }
+
+      // Deduct from wallet
+      const previousBalance = user.walletBalance;
+      await user.deductWalletBalance(totalPrice);
+      
+      paymentStatus = 'Paid';
+      paymentDetails = {
+        paymentMethod: 'Wallet',
+        walletTransactionId: `WALLET-${Date.now()}`,
+        walletAmountUsed: totalPrice,
+        previousBalance: previousBalance,
+        newBalance: user.walletBalance,
+        paymentDate: new Date()
+      };
+    }
+
+    // Create shipping info from user address or provided address
+    let shippingInfo;
+    if (providedAddress && providedAddress.city && providedAddress.barangay) {
+      console.log('📦 Using provided address:', providedAddress);
+      shippingInfo = {
+        address: `${providedAddress.street || ''}, ${providedAddress.barangay || ''}, ${providedAddress.city || ''}`,
+        city: providedAddress.city || '',
+        barangay: providedAddress.barangay || '',
+        street: providedAddress.street || '',
+        zipcode: providedAddress.zipcode || '',
+        phoneNo: user.contact || '',
+        country: 'Philippines'
+      };
+    } else {
+      console.log('📦 Using user profile address:', user.address);
+      shippingInfo = {
+        address: `${user.address.street || ''}, ${user.address.barangay || ''}, ${user.address.city || ''}`,
+        city: user.address.city || '',
+        barangay: user.address.barangay || '',
+        street: user.address.street || '',
+        zipcode: user.address.zipcode || '',
+        phoneNo: user.contact || '',
+        country: 'Philippines'
+      };
+    }
 
     // Create order
     const order = await Order.create({
@@ -234,9 +320,10 @@ exports.soloCheckout = async (req, res) => {
       taxPrice,
       shippingPrice: SHIPPING_PRICE,
       totalPrice,
-      paymentStatus: 'Pending',
+      paymentStatus,
+      paymentDetails,
       orderStatus: 'Processing',
-      paymentMethod: 'Cash on Delivery'
+      paymentMethod: paymentMethod === 'Wallet' ? 'Wallet' : 'Cash on Delivery'
     });
 
     // Decrease stock
@@ -246,7 +333,7 @@ exports.soloCheckout = async (req, res) => {
 
     // Populate order with user and product details
     const populatedOrder = await Order.findById(order._id)
-      .populate('user', 'name email contact')
+      .populate('user', 'name email contact walletBalance')
       .populate('orderItems.product', 'name price unit images');
 
     res.status(201).json({
@@ -257,6 +344,7 @@ exports.soloCheckout = async (req, res) => {
 
   } catch (error) {
     console.error('❌ SOLO CHECKOUT ERROR:', error);
+    console.error('❌ Error details:', error.stack);
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to process checkout'
@@ -297,7 +385,7 @@ exports.getOrderDetails = async (req, res) => {
     const { orderId } = req.params;
 
     const order = await Order.findOne({ _id: orderId, user: userId })
-      .populate('user', 'name email contact address')
+      .populate('user', 'name email contact address walletBalance')
       .populate('orderItems.product', 'name price unit images');
 
     if (!order) {
@@ -338,12 +426,21 @@ exports.cancelOrder = async (req, res) => {
       });
     }
 
-    // ✅ ONLY ALLOW CANCELLATION IF STATUS IS "Processing"
+    // ONLY ALLOW CANCELLATION IF STATUS IS "Processing"
     if (order.orderStatus !== 'Processing') {
       return res.status(400).json({
         success: false,
         message: `Cannot cancel order with status: "${order.orderStatus}". Only "Processing" orders can be cancelled.`
       });
+    }
+
+    // If payment was made via wallet, refund the amount
+    if (order.paymentMethod === 'Wallet' && order.paymentStatus === 'Paid') {
+      const user = await User.findById(userId);
+      if (user) {
+        await user.addWalletBalance(order.totalPrice);
+        console.log(`💰 Refunded ₱${order.totalPrice.toFixed(2)} to user's wallet`);
+      }
     }
 
     // Restore product quantities
@@ -365,7 +462,7 @@ exports.cancelOrder = async (req, res) => {
 
     // Populate order for response
     const cancelledOrder = await Order.findById(order._id)
-      .populate('user', 'name email contact')
+      .populate('user', 'name email contact walletBalance')
       .populate('orderItems.product', 'name price unit images');
 
     res.status(200).json({

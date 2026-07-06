@@ -1,76 +1,27 @@
-// Mapa-Milihan/frontend/src/Components/User/OrderHistory.jsx
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import axios from 'axios';
+import { toast } from 'react-toastify';
 import UserHeader from '../layouts/Header';
-
-// ── Icons ───────────────────────────────────────────────────────────────
-const PackageIcon = ({ size = 24 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-    <circle cx="12" cy="7" r="4"/>
-  </svg>
-);
-
-const CalendarIcon = ({ size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-    <line x1="16" y1="2" x2="16" y2="6"/>
-    <line x1="8" y1="2" x2="8" y2="6"/>
-    <line x1="3" y1="10" x2="21" y2="10"/>
-  </svg>
-);
-
-const ShoppingBagIcon = ({ size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
-    <line x1="3" y1="6" x2="21" y2="6"/>
-    <path d="M16 10a4 4 0 0 1-8 0"/>
-  </svg>
-);
-
-const CheckCircleIcon = ({ size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#2E7D32" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-    <polyline points="22 4 12 14.01 9 11.01"/>
-  </svg>
-);
-
-const ClockIcon = ({ size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#f57c00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10"/>
-    <polyline points="12 6 12 12 16 14"/>
-  </svg>
-);
-
-const TruckIcon = ({ size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#1565C0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M1 3h15v13H1z"/>
-    <path d="M16 8h4l3 3v5h-7V8z"/>
-    <circle cx="5.5" cy="18" r="2.5"/>
-    <circle cx="18.5" cy="18" r="2.5"/>
-  </svg>
-);
-
-const XCircleIcon = ({ size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#c62828" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10"/>
-    <line x1="15" y1="9" x2="9" y2="15"/>
-    <line x1="9" y1="9" x2="15" y2="15"/>
-  </svg>
-);
-
-const ArrowLeftIcon = ({ size = 20 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M19 12H5M12 19l-7-7 7-7"/>
-  </svg>
-);
+import { 
+  FiPackage, 
+  FiClock, 
+  FiCheckCircle, 
+  FiXCircle, 
+  FiTruck, 
+  FiMapPin,
+  FiDollarSign,
+  FiCreditCard
+} from 'react-icons/fi';
+import { MdWallet } from 'react-icons/md';
 
 const OrderHistory = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
+  const [filter, setFilter] = useState('all');
+  const token = localStorage.getItem('token');
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001';
 
   useEffect(() => {
@@ -79,445 +30,248 @@ const OrderHistory = () => {
 
   const fetchOrders = async () => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        navigate('/login');
-        return;
-      }
-
-      const response = await fetch(`${API_BASE_URL}/api/v1/orders`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      setLoading(true);
+      const response = await axios.get(`${API_BASE_URL}/api/v1/orders/my-orders`, {
+        headers: { Authorization: `Bearer ${token}` }
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        setOrders(data.orders || []);
-      } else {
-        setError(data.message || 'Failed to fetch orders');
+      if (response.data.success) {
+        setOrders(response.data.orders);
       }
-    } catch (err) {
-      console.error('Fetch orders error:', err);
-      setError('Network error. Please try again.');
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      toast.error('Failed to load orders');
     } finally {
       setLoading(false);
     }
   };
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric', 
-      year: 'numeric' 
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'Pending': return 'bg-yellow-100 text-yellow-800';
+      case 'Processing': return 'bg-blue-100 text-blue-800';
+      case 'Accepted': return 'bg-indigo-100 text-indigo-800';
+      case 'Out for Delivery': return 'bg-purple-100 text-purple-800';
+      case 'Delivered': return 'bg-green-100 text-green-800';
+      case 'Cancelled': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'Pending': return <FiClock className="text-yellow-600" />;
+      case 'Processing': return <FiPackage className="text-blue-600" />;
+      case 'Accepted': return <FiCheckCircle className="text-indigo-600" />;
+      case 'Out for Delivery': return <FiTruck className="text-purple-600" />;
+      case 'Delivered': return <FiCheckCircle className="text-green-600" />;
+      case 'Cancelled': return <FiXCircle className="text-red-600" />;
+      default: return <FiClock className="text-gray-600" />;
+    }
+  };
+
+  const getPaymentMethodIcon = (method) => {
+    switch (method) {
+      case 'Wallet': return <MdWallet className="text-green-500" />;
+      case 'Cash on Delivery': return <FiCreditCard className="text-blue-500" />;
+      default: return <FiDollarSign className="text-gray-500" />;
+    }
+  };
+
+  const getPaymentStatusColor = (status) => {
+    switch (status) {
+      case 'Paid': return 'text-green-600';
+      case 'Pending': return 'text-yellow-600';
+      case 'Failed': return 'text-red-600';
+      default: return 'text-gray-600';
+    }
+  };
+
+  const filteredOrders = filter === 'all' 
+    ? orders 
+    : orders.filter(order => order.orderStatus === filter);
+
+  const formatDate = (date) => {
+    return new Date(date).toLocaleDateString('en-PH', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
     });
   };
 
-  // ✅ Updated getStatusBadge with new order statuses
-  const getStatusBadge = (status) => {
-    const statusMap = {
-      'Processing': { color: '#f57c00', bg: '#fff3e0', icon: <ClockIcon size={14} /> },
-      'Accepted': { color: '#2E7D32', bg: '#e8f5e9', icon: <CheckCircleIcon size={14} /> },
-      'Out for Delivery': { color: '#1565C0', bg: '#e3f2fd', icon: <TruckIcon size={14} /> },
-      'Delivered': { color: '#2E7D32', bg: '#e8f5e9', icon: <CheckCircleIcon size={14} /> },
-      'Cancelled': { color: '#c62828', bg: '#ffebee', icon: <XCircleIcon size={14} /> }
-    };
-    return statusMap[status] || { color: '#78909c', bg: '#f5f7f5', icon: <ClockIcon size={14} /> };
+  const getOrderCount = (status) => {
+    return orders.filter(order => order.orderStatus === status).length;
   };
-
-  const handleOrderClick = (orderId) => {
-    navigate(`/orders/${orderId}`);
-  };
-
-  // ── Loading State ──
-  if (loading) {
-    return (
-      <div className="full-bleed w-full min-h-screen bg-gray-50 flex flex-col">
-        <UserHeader />
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Loading your orders...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="full-bleed w-full min-h-screen bg-gray-50 flex flex-col">
       <UserHeader />
 
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap');
+      <div className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full">
+        <h1 className="text-2xl font-bold text-gray-800 mb-6">Order History</h1>
 
-        @keyframes fadeInUp {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-
-        .orders-root {
-          font-family: 'DM Sans', sans-serif;
-          flex: 1;
-          padding: 32px 20px 60px;
-          max-width: 1000px;
-          margin: 0 auto;
-          width: 100%;
-        }
-
-        .orders-header {
-          display: flex;
-          align-items: center;
-          gap: 16px;
-          margin-bottom: 24px;
-          animation: fadeInUp 0.3s ease both;
-        }
-
-        .orders-header h1 {
-          font-family: 'DM Serif Display', serif;
-          font-size: 1.8rem;
-          color: #1a3d2b;
-          margin: 0;
-        }
-
-        .orders-header .count-badge {
-          background: #e8f5e9;
-          color: #2E7D32;
-          padding: 2px 12px;
-          border-radius: 12px;
-          font-size: 0.8rem;
-          font-weight: 600;
-        }
-
-        .orders-back-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          padding: 8px 16px;
-          background: #fff;
-          border: 1.5px solid #e0e7e0;
-          border-radius: 10px;
-          font-family: 'DM Sans', sans-serif;
-          font-size: 0.85rem;
-          color: #546e7a;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-
-        .orders-back-btn:hover {
-          border-color: #66BB6A;
-          color: #2E7D32;
-        }
-
-        /* ── Error ── */
-        .orders-error {
-          background: #ffebee;
-          border: 1px solid #ffcdd2;
-          color: #c62828;
-          padding: 14px 18px;
-          border-radius: 10px;
-          margin-bottom: 20px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-        }
-
-        .orders-error button {
-          padding: 4px 16px;
-          background: #ef5350;
-          color: #fff;
-          border: none;
-          border-radius: 6px;
-          cursor: pointer;
-          font-family: 'DM Sans', sans-serif;
-          font-size: 0.8rem;
-          font-weight: 600;
-        }
-
-        .orders-error button:hover {
-          opacity: 0.85;
-        }
-
-        /* ── Empty State ── */
-        .orders-empty {
-          background: #fff;
-          border-radius: 16px;
-          padding: 60px 20px;
-          text-align: center;
-          border: 1.5px solid #e8f5e9;
-          box-shadow: 0 2px 12px rgba(27, 94, 32, 0.06);
-        }
-
-        .orders-empty .empty-icon {
-          color: #c8e6c9;
-          margin-bottom: 16px;
-        }
-
-        .orders-empty h3 {
-          font-family: 'DM Serif Display', serif;
-          color: #2E7D32;
-          margin: 0 0 8px;
-          font-size: 1.3rem;
-        }
-
-        .orders-empty p {
-          color: #78909c;
-          margin: 0 0 20px;
-          font-size: 0.95rem;
-        }
-
-        .orders-empty .shop-btn {
-          padding: 12px 32px;
-          background: linear-gradient(135deg, #2E7D32, #43A047);
-          color: #fff;
-          border: none;
-          border-radius: 10px;
-          font-family: 'DM Sans', sans-serif;
-          font-size: 0.95rem;
-          font-weight: 600;
-          cursor: pointer;
-          transition: opacity 0.2s, transform 0.15s;
-        }
-
-        .orders-empty .shop-btn:hover {
-          opacity: 0.88;
-          transform: translateY(-2px);
-        }
-
-        /* ── Order Cards ── */
-        .order-card {
-          background: #fff;
-          border-radius: 14px;
-          border: 1.5px solid #e8f5e9;
-          box-shadow: 0 2px 12px rgba(27, 94, 32, 0.06);
-          padding: 20px 24px;
-          margin-bottom: 16px;
-          cursor: pointer;
-          transition: all 0.2s;
-          animation: fadeInUp 0.3s ease both;
-        }
-
-        .order-card:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 20px rgba(27, 94, 32, 0.1);
-          border-color: #a5d6a7;
-        }
-
-        .order-card-top {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          flex-wrap: wrap;
-          gap: 12px;
-          margin-bottom: 12px;
-        }
-
-        .order-id {
-          font-weight: 600;
-          color: #263238;
-          font-size: 0.95rem;
-        }
-
-        .order-id .id-label {
-          color: #78909c;
-          font-weight: 400;
-        }
-
-        .order-status {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 4px 14px;
-          border-radius: 12px;
-          font-size: 0.75rem;
-          font-weight: 600;
-          white-space: nowrap;
-        }
-
-        .order-meta {
-          display: flex;
-          gap: 20px;
-          flex-wrap: wrap;
-          font-size: 0.82rem;
-          color: #78909c;
-        }
-
-        .order-meta-item {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-        }
-
-        .order-items-preview {
-          display: flex;
-          gap: 8px;
-          margin-top: 12px;
-          padding-top: 12px;
-          border-top: 1px solid #e8f5e9;
-          flex-wrap: wrap;
-        }
-
-        .order-item-preview {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          background: #f5f7f5;
-          padding: 4px 10px 4px 6px;
-          border-radius: 6px;
-          font-size: 0.8rem;
-          color: #546e7a;
-        }
-
-        .order-item-preview .item-image {
-          width: 28px;
-          height: 28px;
-          border-radius: 4px;
-          overflow: hidden;
-          background: #e8f5e9;
-          flex-shrink: 0;
-        }
-
-        .order-item-preview .item-image img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-
-        .order-item-preview .item-name {
-          max-width: 120px;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .order-total {
-          font-weight: 600;
-          color: #2E7D32;
-          font-size: 0.95rem;
-          margin-left: auto;
-        }
-
-        @media (max-width: 640px) {
-          .orders-root { padding: 16px 12px; }
-          .orders-header { flex-wrap: wrap; }
-          .orders-header h1 { font-size: 1.4rem; }
-          .order-card { padding: 16px; }
-          .order-card-top { flex-direction: column; }
-          .order-meta { gap: 12px; }
-          .order-items-preview { flex-direction: column; }
-          .order-item-preview { width: 100%; }
-          .order-item-preview .item-name { max-width: none; }
-        }
-      `}</style>
-
-      <div className="orders-root">
-        {/* ── Header ── */}
-        <div className="orders-header">
-          <button className="orders-back-btn" onClick={() => navigate(-1)}>
-            <ArrowLeftIcon size={16} /> Back
+        {/* Filter Tabs */}
+        <div className="flex flex-wrap gap-2 mb-6">
+          <button
+            onClick={() => setFilter('all')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              filter === 'all' 
+                ? 'bg-green-500 text-white' 
+                : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+            }`}
+          >
+            All ({orders.length})
           </button>
-          <h1>Order History</h1>
-          <span className="count-badge">{orders.length} orders</span>
+          <button
+            onClick={() => setFilter('Processing')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              filter === 'Processing' 
+                ? 'bg-blue-500 text-white' 
+                : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+            }`}
+          >
+            Processing ({getOrderCount('Processing')})
+          </button>
+          <button
+            onClick={() => setFilter('Accepted')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              filter === 'Accepted' 
+                ? 'bg-indigo-500 text-white' 
+                : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+            }`}
+          >
+            Accepted ({getOrderCount('Accepted')})
+          </button>
+          <button
+            onClick={() => setFilter('Out for Delivery')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              filter === 'Out for Delivery' 
+                ? 'bg-purple-500 text-white' 
+                : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+            }`}
+          >
+            Out for Delivery ({getOrderCount('Out for Delivery')})
+          </button>
+          <button
+            onClick={() => setFilter('Delivered')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              filter === 'Delivered' 
+                ? 'bg-green-500 text-white' 
+                : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+            }`}
+          >
+            Delivered ({getOrderCount('Delivered')})
+          </button>
+          <button
+            onClick={() => setFilter('Cancelled')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              filter === 'Cancelled' 
+                ? 'bg-red-500 text-white' 
+                : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+            }`}
+          >
+            Cancelled ({getOrderCount('Cancelled')})
+          </button>
         </div>
 
-        {/* ── Error ── */}
-        {error && (
-          <div className="orders-error">
-            <span>⚠️ {error}</span>
-            <button onClick={fetchOrders}>Retry</button>
+        {/* Orders List */}
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="w-8 h-8 border-2 border-green-200 border-t-green-500 rounded-full animate-spin"></div>
           </div>
-        )}
-
-        {/* ── Orders ── */}
-        {orders.length === 0 ? (
-          <div className="orders-empty">
-            <div className="empty-icon"><PackageIcon size={64} /></div>
-            <h3>No orders yet</h3>
-            <p>You haven't placed any orders yet. Start shopping now!</p>
-            <button className="shop-btn" onClick={() => navigate('/products')}>
+        ) : filteredOrders.length === 0 ? (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
+            <FiPackage className="text-4xl text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-500">No orders found</p>
+            <button
+              onClick={() => navigate('/products')}
+              className="mt-2 text-green-600 hover:text-green-700 font-medium"
+            >
               Start Shopping
             </button>
           </div>
         ) : (
-          orders.map((order, index) => {
-            const statusInfo = getStatusBadge(order.orderStatus);
-            const totalItems = order.orderItems?.reduce((sum, item) => sum + item.quantity, 0) || 0;
-
-            return (
+          <div className="space-y-4">
+            {filteredOrders.map((order) => (
               <div 
                 key={order._id} 
-                className="order-card"
-                onClick={() => handleOrderClick(order._id)}
-                style={{ animationDelay: `${index * 0.05}s` }}
+                className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+                onClick={() => navigate(`/orders/${order._id}`)}
               >
-                <div className="order-card-top">
-                  <div className="order-id">
-                    <span className="id-label">Order #</span>
-                    {order._id?.slice(-8) || 'N/A'}
-                  </div>
-                  <div 
-                    className="order-status"
-                    style={{ 
-                      backgroundColor: statusInfo.bg, 
-                      color: statusInfo.color 
-                    }}
-                  >
-                    {statusInfo.icon} {order.orderStatus || 'Processing'}
-                  </div>
-                </div>
-
-                <div className="order-meta">
-                  <span className="order-meta-item">
-                    <CalendarIcon size={14} /> {formatDate(order.createdAt)}
-                  </span>
-                  <span className="order-meta-item">
-                    <ShoppingBagIcon size={14} /> {totalItems} item{totalItems > 1 ? 's' : ''}
-                  </span>
-                  <span className="order-meta-item">
-                    💳 {order.paymentMethod || 'Cash on Delivery'}
-                  </span>
-                </div>
-
-                <div className="order-items-preview">
-                  {order.orderItems?.slice(0, 4).map((item, idx) => (
-                    <div key={idx} className="order-item-preview">
-                      <div className="item-image">
-                        {item.image ? (
-                          <img src={item.image} alt={item.name} />
-                        ) : (
-                          <div style={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            justifyContent: 'center',
-                            height: '100%',
-                            color: '#a5b8a5',
-                            fontSize: '0.5rem'
-                          }}>
-                            No img
-                          </div>
-                        )}
-                      </div>
-                      <span className="item-name">{item.name}</span>
-                      <span style={{ color: '#78909c', fontSize: '0.7rem' }}>
-                        ×{item.quantity}
-                      </span>
-                    </div>
-                  ))}
-                  {order.orderItems?.length > 4 && (
-                    <span style={{ fontSize: '0.8rem', color: '#78909c', padding: '4px 8px' }}>
-                      +{order.orderItems.length - 4} more
+                {/* Order Header */}
+                <div className="flex flex-wrap items-center justify-between p-4 border-b border-gray-100">
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm font-medium text-gray-600">
+                      Order #{order._id.slice(-8).toUpperCase()}
                     </span>
-                  )}
-                  <span className="order-total">
-                    ₱{order.totalPrice?.toFixed(2) || '0.00'}
-                  </span>
+                    <span className="text-xs text-gray-400">
+                      {formatDate(order.createdAt)}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1">
+                      {getPaymentMethodIcon(order.paymentMethod)}
+                      <span className="text-xs text-gray-600">{order.paymentMethod}</span>
+                    </div>
+                    <div className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.orderStatus)} flex items-center gap-1`}>
+                      {getStatusIcon(order.orderStatus)}
+                      <span>{order.orderStatus}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Order Items */}
+                <div className="p-4">
+                  <div className="space-y-2">
+                    {order.orderItems.slice(0, 3).map((item, index) => (
+                      <div key={index} className="flex items-center gap-3">
+                        <img 
+                          src={item.image || '/default-product.png'} 
+                          alt={item.name}
+                          className="w-12 h-12 object-cover rounded-lg"
+                        />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-gray-800">{item.name}</p>
+                          <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
+                        </div>
+                        <p className="text-sm font-semibold text-gray-800">
+                          ₱{(item.price * item.quantity).toFixed(2)}
+                        </p>
+                      </div>
+                    ))}
+                    {order.orderItems.length > 3 && (
+                      <p className="text-xs text-gray-400 text-center">
+                        +{order.orderItems.length - 3} more items
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Order Footer */}
+                <div className="flex flex-wrap items-center justify-between p-4 bg-gray-50 border-t border-gray-100">
+                  <div className="flex items-center gap-4 text-sm">
+                    <div className="flex items-center gap-1 text-gray-600">
+                      <FiMapPin className="text-gray-400" />
+                      <span className="text-xs">{order.shippingInfo?.barangay || order.shippingAddress?.barangay || ''}, {order.shippingInfo?.city || order.shippingAddress?.city || ''}</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-gray-600">
+                      <FiTruck className="text-gray-400" />
+                      <span className="text-xs">₱{order.shippingPrice?.toFixed(2) || '0.00'}</span>
+                    </div>
+                    <div className={`text-xs font-medium ${getPaymentStatusColor(order.paymentStatus)}`}>
+                      {order.paymentStatus}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-500">Total</p>
+                    <p className="text-lg font-bold text-green-600">₱{order.totalPrice?.toFixed(2) || '0.00'}</p>
+                  </div>
                 </div>
               </div>
-            );
-          })
+            ))}
+          </div>
         )}
       </div>
     </div>

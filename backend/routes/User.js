@@ -1,3 +1,4 @@
+// backend/routes/User.js
 const express = require('express');
 const upload = require('../utils/Multer');
 const {
@@ -18,6 +19,7 @@ const {
   addWalletBalance,
   deductWalletBalance,
   checkWalletBalance,
+  getWalletTransactions, // Add this import
   updateUserRole,
   getAllUsers,
   getUsersByRole
@@ -60,6 +62,7 @@ router.get('/wallet/balance', isAuthenticatedUser, getWalletBalance);
 router.post('/wallet/add', isAuthenticatedUser, addWalletBalance);
 router.post('/wallet/deduct', isAuthenticatedUser, deductWalletBalance);
 router.post('/wallet/check', isAuthenticatedUser, checkWalletBalance);
+router.get('/wallet/transactions', isAuthenticatedUser, getWalletTransactions); // Add this route
 
 // ========== ADMIN ROUTES ==========
 router.put('/admin/role/:userId', isAuthenticatedUser, isAdmin, updateUserRole);

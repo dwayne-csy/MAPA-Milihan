@@ -80,13 +80,13 @@ const orderSchema = new mongoose.Schema({
   
   paymentMethod: {
     type: String,
-    enum: ['Cash on Delivery'],
+    enum: ['Cash on Delivery', 'Wallet'],
     default: 'Cash on Delivery'
   },
   
   paymentStatus: {
     type: String,
-    enum: ['Pending', 'Accepted', 'Cancelled', 'Completed'],
+    enum: ['Pending', 'Paid', 'Accepted', 'Cancelled', 'Completed'],
     default: 'Pending'
   },
   
@@ -94,10 +94,13 @@ const orderSchema = new mongoose.Schema({
     paymentId: String,
     payerId: String,
     paymentMethod: String,
-    paymentDate: Date
+    paymentDate: Date,
+    walletTransactionId: String,
+    walletAmountUsed: Number,
+    previousBalance: Number,
+    newBalance: Number
   },
   
-  // ✅ Updated orderStatus with new statuses
   orderStatus: {
     type: String,
     enum: ['Processing', 'Accepted', 'Out for Delivery', 'Delivered', 'Cancelled'],
@@ -151,12 +154,10 @@ const orderSchema = new mongoose.Schema({
 orderSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
   
-  // Set deliveredAt when status changes to Delivered
   if (this.orderStatus === 'Delivered' && !this.deliveredAt) {
     this.deliveredAt = Date.now();
   }
   
-  // Set cancelledAt when status changes to Cancelled
   if (this.orderStatus === 'Cancelled' && !this.cancelledAt) {
     this.cancelledAt = Date.now();
   }

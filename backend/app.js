@@ -35,7 +35,7 @@ app.use('/api/v1/groqchatbot', groqChatbotRoutes);
 app.use('/api/forums', forumRoutes);
 app.use('/api/v1/upload', uploadRoutes);
 app.use('/api/v1', cartRoutes);
-app.use('/api/v1', orderRoutes);
+app.use('/api/v1/orders', orderRoutes);
 app.use('/api/v1/manage-orders', manageOrderRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/messages', messageRoutes);
