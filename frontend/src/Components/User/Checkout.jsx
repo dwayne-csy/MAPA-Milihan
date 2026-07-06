@@ -12,7 +12,8 @@ import {
   FiTruck, 
   FiCheckCircle,
   FiPlus,
-  FiMinus
+  FiMinus,
+  FiShoppingBag
 } from 'react-icons/fi';
 import { MdWallet } from 'react-icons/md';
 
@@ -382,7 +383,7 @@ const Checkout = () => {
 
       if (response.data.success) {
         toast.success('Order placed successfully!');
-        navigate('/checkout/confirmation', {  // Changed from '/checkout-confirmation' to '/checkout/confirmation'
+        navigate('/checkout/confirmation', {
           state: { 
             orderId: response.data.order._id,
             paymentMethod: selectedPaymentMethod,
@@ -661,19 +662,25 @@ const Checkout = () => {
               )}
             </div>
 
-            {/* Place Order Button */}
+            {/* Place Order Button - Updated */}
             <button
               onClick={handlePlaceOrder}
               disabled={loading || (isCartCheckout && cartItems.length === 0)}
-              className="w-full py-3 px-4 bg-green-500 text-white rounded-xl font-medium hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full py-4 px-6 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white rounded-xl font-semibold text-base transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 shadow-lg shadow-green-200 hover:shadow-xl hover:shadow-green-300 transform hover:-translate-y-0.5"
               type="button"
             >
               {loading ? (
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                <div className="flex items-center gap-3">
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <span>Processing...</span>
+                </div>
               ) : (
                 <>
-                  <FiDollarSign size={18} />
-                  Place Order
+                  <FiShoppingBag size={20} className="text-white" />
+                  <span>Place Order</span>
+                  <span className="ml-1 text-white/80 text-sm font-normal">
+                    ₱{getTotal().toFixed(2)}
+                  </span>
                 </>
               )}
             </button>

@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'react-toastify';
-import FarmerHeader from '../layouts/FarmerHeader';
+import FarmerHeader from '../layouts/Header';
 import { 
   FiPlus, 
   FiMinus, 
@@ -16,10 +16,7 @@ import {
   FiCheck,
   FiChevronDown,
   FiUser,
-  FiPhone,
-  FiTrendingUp,
-  FiTrendingDown,
-  FiCalendar
+  FiPhone
 } from 'react-icons/fi';
 import { 
   MdWallet
@@ -39,9 +36,7 @@ const FarmerWallet = () => {
   const [quickAmounts, setQuickAmounts] = useState([50, 100, 200, 500, 1000]);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('gcash');
   const [showPaymentDropdown, setShowPaymentDropdown] = useState(false);
-  const [totalTopups, setTotalTopups] = useState(0);
   const [totalSpent, setTotalSpent] = useState(0);
-  const [filter, setFilter] = useState('all'); // all, credit, debit
   
   // Payment account details
   const [accountNumber, setAccountNumber] = useState('');
@@ -111,21 +106,17 @@ const FarmerWallet = () => {
 
   // Calculate totals from transactions
   const calculateTotals = useCallback((transactionsList) => {
-    let topups = 0;
     let spent = 0;
     
     transactionsList.forEach(t => {
-      if (t.type === 'credit' && t.status === 'completed') {
-        topups += t.amount;
-      } else if (t.type === 'debit' && t.status === 'completed') {
+      if (t.type === 'debit' && t.status === 'completed') {
         spent += t.amount;
       }
     });
     
-    setTotalTopups(topups);
     setTotalSpent(spent);
     
-    return { totalTopups: topups, totalSpent: spent };
+    return { totalSpent: spent };
   }, []);
 
   // Fetch wallet balance
@@ -148,8 +139,8 @@ const FarmerWallet = () => {
     } catch (error) {
       console.error('Error fetching wallet balance:', error);
       if (error.response?.status === 403) {
-        toast.error('Wallet is only available for farmers');
-        navigate('/farmer/dashboard');
+        toast.error('Wallet is only available for users, farmers, and riders');
+        navigate('/profile');
       } else if (error.response?.status === 401) {
         toast.error('Please login again');
         navigate('/login');
@@ -177,23 +168,16 @@ const FarmerWallet = () => {
         calculateTotals(transactionsData);
       } else {
         setTransactions([]);
-        setTotalTopups(0);
         setTotalSpent(0);
       }
     } catch (error) {
       console.error('Error fetching transactions:', error);
-      if (walletBalance > 0 && transactions.length === 0) {
-        setTotalTopups(walletBalance);
-        setTotalSpent(0);
-      } else {
-        setTransactions([]);
-        setTotalTopups(0);
-        setTotalSpent(0);
-      }
+      setTransactions([]);
+      setTotalSpent(0);
     } finally {
       setLoadingTransactions(false);
     }
-  }, [API_BASE_URL, token, walletBalance, transactions.length, calculateTotals]);
+  }, [API_BASE_URL, token, calculateTotals]);
 
   // Reset form fields
   const resetForm = () => {
@@ -245,9 +229,11 @@ const FarmerWallet = () => {
       );
 
       if (response.data.success) {
+        // Update wallet balance
         setWalletBalance(response.data.walletBalance);
+        
+        // Refresh transactions
         await fetchTransactions();
-        setTotalTopups(prev => prev + amount);
         
         toast.success(`✅ Successfully added ₱${amount} to your wallet via ${method?.name}`);
         setShowTopUpModal(false);
@@ -294,9 +280,9 @@ const FarmerWallet = () => {
   const getTransactionIcon = (type) => {
     switch (type) {
       case 'credit':
-        return <FiTrendingUp className="text-green-500" />;
+        return <FiPlus className="text-green-500" />;
       case 'debit':
-        return <FiTrendingDown className="text-red-500" />;
+        return <FiMinus className="text-red-500" />;
       default:
         return <FiClock className="text-gray-500" />;
     }
@@ -318,14 +304,6 @@ const FarmerWallet = () => {
 
   // Get current payment method fields
   const currentMethod = paymentMethods.find(m => m.id === selectedPaymentMethod);
-
-  // Filter transactions
-  const filteredTransactions = transactions.filter(t => {
-    if (filter === 'all') return true;
-    if (filter === 'credit') return t.type === 'credit';
-    if (filter === 'debit') return t.type === 'debit';
-    return true;
-  });
 
   // Render payment fields based on selected method
   const renderPaymentFields = () => {
@@ -384,21 +362,15 @@ const FarmerWallet = () => {
       <div className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full">
         {/* Back Button */}
         <button 
-          onClick={() => navigate('/farmer/dashboard')} 
+          onClick={() => navigate(-1)} 
           className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-4 transition-colors"
         >
           <FiArrowLeft size={20} />
-          <span className="text-sm font-medium">Back to Dashboard</span>
+          <span className="text-sm font-medium">Back</span>
         </button>
 
-        {/* Farmer Wallet Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-800">Farmer Wallet</h1>
-          <p className="text-sm text-gray-500">Manage your farming income and expenses</p>
-        </div>
-
         {/* Wallet Balance Card */}
-        <div className="bg-gradient-to-r from-green-600 to-emerald-600 rounded-2xl p-6 text-white shadow-lg mb-6">
+        <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-2xl p-6 text-white shadow-lg mb-6">
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2 mb-1">
@@ -429,7 +401,7 @@ const FarmerWallet = () => {
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
           <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-green-50 rounded-lg">
@@ -445,21 +417,8 @@ const FarmerWallet = () => {
           </div>
           <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-50 rounded-lg">
-                <FiTrendingUp className="text-blue-600 text-lg" />
-              </div>
-              <div>
-                <div className="text-xs text-gray-500 font-medium">Total Top-ups</div>
-                <div className="text-lg font-semibold text-gray-800">
-                  {formatCurrency(totalTopups)}
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-            <div className="flex items-center gap-3">
               <div className="p-2 bg-purple-50 rounded-lg">
-                <FiTrendingDown className="text-purple-600 text-lg" />
+                <FiRefreshCw className="text-purple-600 text-lg" />
               </div>
               <div>
                 <div className="text-xs text-gray-500 font-medium">Total Spent</div>
@@ -475,48 +434,13 @@ const FarmerWallet = () => {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="flex items-center justify-between p-4 border-b border-gray-100">
             <h2 className="text-sm font-semibold text-gray-800">Transaction History</h2>
-            <div className="flex items-center gap-3">
-              {/* Filter Buttons */}
-              <div className="flex gap-1">
-                <button
-                  onClick={() => setFilter('all')}
-                  className={`px-3 py-1 text-xs rounded-lg transition-colors ${
-                    filter === 'all' 
-                      ? 'bg-green-500 text-white' 
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  All
-                </button>
-                <button
-                  onClick={() => setFilter('credit')}
-                  className={`px-3 py-1 text-xs rounded-lg transition-colors ${
-                    filter === 'credit' 
-                      ? 'bg-green-500 text-white' 
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  Income
-                </button>
-                <button
-                  onClick={() => setFilter('debit')}
-                  className={`px-3 py-1 text-xs rounded-lg transition-colors ${
-                    filter === 'debit' 
-                      ? 'bg-green-500 text-white' 
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  Expenses
-                </button>
-              </div>
-              <button 
-                onClick={fetchTransactions}
-                className="text-xs text-green-600 hover:text-green-700 flex items-center gap-1"
-              >
-                <FiRefreshCw size={14} />
-                Refresh
-              </button>
-            </div>
+            <button 
+              onClick={fetchTransactions}
+              className="text-xs text-green-600 hover:text-green-700 flex items-center gap-1"
+            >
+              <FiRefreshCw size={14} />
+              Refresh
+            </button>
           </div>
 
           <div className="p-4">
@@ -525,16 +449,16 @@ const FarmerWallet = () => {
                 <div className="w-6 h-6 border-2 border-green-200 border-t-green-500 rounded-full animate-spin"></div>
                 <span className="ml-2 text-sm text-gray-500">Loading transactions...</span>
               </div>
-            ) : filteredTransactions.length === 0 ? (
+            ) : transactions.length === 0 ? (
               <div className="text-center py-8 text-gray-400">
                 <FiClock className="text-3xl text-gray-300 mx-auto mb-2" />
                 <p className="text-sm font-medium">No transactions yet</p>
-                <p className="text-xs">Your transaction history will appear here</p>
+                <p className="text-xs">Your transaction history will appear here after you top up</p>
               </div>
             ) : (
               <div className="space-y-3">
-                {filteredTransactions.map((transaction) => (
-                  <div key={transaction._id || transaction.id || Date.now()} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                {transactions.map((transaction) => (
+                  <div key={transaction._id || transaction.id || transaction.orderId || Date.now()} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-white rounded-lg shadow-sm">
                         {getTransactionIcon(transaction.type)}
