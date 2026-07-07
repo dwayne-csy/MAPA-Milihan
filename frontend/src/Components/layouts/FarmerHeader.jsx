@@ -1,3 +1,4 @@
+// Mapa-Milihan/frontend/src/Components/layouts/FarmerHeader.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import EditIcon from '@mui/icons-material/Edit';
@@ -13,6 +14,7 @@ import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import MapIcon from '@mui/icons-material/Map';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import WalletIcon from '@mui/icons-material/Wallet';
+import HistoryIcon from '@mui/icons-material/History';
 import Badge from '@mui/material/Badge';
 import logo from '../logo/logo.png';
 
@@ -123,11 +125,21 @@ const FarmerHeader = () => {
     setDropdownOpen(false);
   };
 
+  const handleOrderHistory = () => {
+    navigate('/farmer/orders');
+    setDropdownOpen(false);
+  };
+
   const dropdownItems = [
     { 
       label: 'Wallet', 
       icon: WalletIcon, 
       action: handleWallet
+    },
+    { 
+      label: 'Order History', 
+      icon: HistoryIcon, 
+      action: handleOrderHistory
     },
     { 
       label: 'Manage Orders', 
@@ -530,7 +542,7 @@ const FarmerHeader = () => {
 
         .mobile-nav.open {
           display: flex;
-          max-height: 600px;
+          max-height: 800px;
         }
 
         .mobile-nav-link {

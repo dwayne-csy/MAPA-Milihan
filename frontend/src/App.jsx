@@ -41,6 +41,10 @@ import Report from "./Components/User/Report";
 import FarmerReport from "./Components/Farmer/FarmerReport";
 import Wallet from "./Components/User/Wallet";
 import FarmerWallet from "./Components/Farmer/FarmerWallet";
+import FarmerCheckout from "./Components/Farmer/FarmerCheckout";
+import FarmerCheckoutConfirmation from "./Components/Farmer/FarmerCheckoutConfirmation";
+import FarmerOrderDetails from "./Components/Farmer/FarmerOrderDetails";
+import FarmerOrderHistory from "./Components/Farmer/FarmerOrderHistory";
 
 // Profile wrapper component to determine which profile to show
 const ProfileWrapper = () => {
@@ -112,6 +116,10 @@ const App = () => {
         <Route path="/farmer/cart" element={<ProtectedRoute requiredRole="farmer"><FarmerCart /></ProtectedRoute>} />
         <Route path="/farmer/report" element={<ProtectedRoute requiredRole="farmer"><FarmerReport /></ProtectedRoute>} />
         <Route path="/farmer/wallet" element={<ProtectedRoute requiredRole="farmer"><FarmerWallet /></ProtectedRoute>} />
+        <Route path="/farmer/checkout" element={<ProtectedRoute requiredRole="farmer"><FarmerCheckout /></ProtectedRoute>} />
+        <Route path="/farmer/checkout/confirmation" element={<ProtectedRoute requiredRole="farmer"><FarmerCheckoutConfirmation /></ProtectedRoute>} />
+        <Route path="/farmer/orders" element={<ProtectedRoute requiredRole="farmer"><FarmerOrderHistory /></ProtectedRoute>} />
+        <Route path="/farmer/orders/:orderId" element={<ProtectedRoute requiredRole="farmer"><FarmerOrderDetails /></ProtectedRoute>} />
 
         {/* Farmer Messages Route */}
         <Route path="/farmer/messages" element={<ProtectedRoute requiredRole="farmer"><FarmerMessage /></ProtectedRoute>} />

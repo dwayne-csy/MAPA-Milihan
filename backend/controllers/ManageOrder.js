@@ -11,14 +11,17 @@ exports.getAllOrders = async (req, res) => {
     const { status, search } = req.query;
     const userId = req.user.id;
 
+    console.log(`👤 Farmer ID: ${userId}`);
+
     // First, check if farmer has any products
     const farmerProducts = await Product.find({ 
       farmer: userId,
       isDeleted: false 
-    }).select('_id');
+    }).select('_id name');
 
     const productIds = farmerProducts.map(p => p._id);
-    console.log(`📋 Found ${productIds.length} products for farmer`);
+    console.log(`📋 Found ${productIds.length} products for farmer:`);
+    console.log(`📋 Product IDs: ${productIds.map(id => id.toString()).join(', ')}`);
 
     // If farmer has no products, return empty array immediately
     if (productIds.length === 0) {
@@ -35,6 +38,8 @@ exports.getAllOrders = async (req, res) => {
     let query = {
       'orderItems.product': { $in: productIds }
     };
+
+    console.log('🔍 Initial query (by product IDs):', JSON.stringify(query, null, 2));
 
     // Filter by status if provided and valid
     if (status && status !== 'All' && status !== 'undefined' && status !== 'null' && status.trim() !== '') {
@@ -75,11 +80,19 @@ exports.getAllOrders = async (req, res) => {
     console.log('🔍 Final query:', JSON.stringify(query, null, 2));
 
     const orders = await Order.find(query)
-      .populate('user', 'name email contact')
+      .populate('user', 'name email contact role')
       .populate('orderItems.product', 'name price unit images')
       .sort({ createdAt: -1 });
 
-    console.log(`✅ Found ${orders.length} orders`);
+    console.log(`✅ Found ${orders.length} orders from database`);
+
+    // Log each order's items for debugging
+    orders.forEach((order, index) => {
+      console.log(`📦 Order ${index + 1} (${order._id}):`);
+      order.orderItems.forEach((item, i) => {
+        console.log(`   Item ${i + 1}: ${item.name}, Farmer: ${item.farmer?.toString() || 'null'}, Product: ${item.product?.toString() || 'null'}`);
+      });
+    });
 
     // If no orders found, return empty array
     if (orders.length === 0) {
@@ -93,21 +106,35 @@ exports.getAllOrders = async (req, res) => {
 
     // Filter order items to only show farmer's products
     const filteredOrders = orders.map(order => {
-      const farmerItems = order.orderItems.filter(item => 
-        item.farmer && item.farmer.toString() === userId.toString()
-      );
+      const farmerItems = order.orderItems.filter(item => {
+        const itemFarmerId = item.farmer ? item.farmer.toString() : null;
+        const isMatch = itemFarmerId === userId.toString();
+        if (isMatch) {
+          console.log(`✅ Found matching item: ${item.name}, Farmer: ${itemFarmerId}, User: ${userId}`);
+        }
+        return isMatch;
+      });
 
       if (farmerItems.length > 0) {
+        // Calculate total for farmer's items only
+        const itemsPrice = farmerItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        const taxPrice = itemsPrice * 0.12;
+        const shippingPrice = order.shippingPrice || 50;
+        const totalPrice = itemsPrice + taxPrice + shippingPrice;
+
         return {
           ...order.toObject(),
           orderItems: farmerItems,
-          itemsPrice: farmerItems.reduce((sum, item) => sum + (item.price * item.quantity), 0),
-          taxPrice: farmerItems.reduce((sum, item) => sum + (item.price * item.quantity * 0.12), 0),
-          totalPrice: farmerItems.reduce((sum, item) => sum + (item.price * item.quantity * 1.12), 0) + 50
+          itemsPrice: itemsPrice,
+          taxPrice: taxPrice,
+          shippingPrice: shippingPrice,
+          totalPrice: totalPrice
         };
       }
       return null;
     }).filter(order => order !== null);
+
+    console.log(`✅ Returning ${filteredOrders.length} filtered orders`);
 
     res.status(200).json({
       success: true,
@@ -132,6 +159,7 @@ exports.getOrderById = async (req, res) => {
     const userId = req.user.id;
 
     console.log('📋 Fetching order details for ID:', id);
+    console.log(`👤 Farmer ID: ${userId}`);
 
     // Check if ID is valid ObjectId
     if (!id || id.length !== 24) {
@@ -142,7 +170,7 @@ exports.getOrderById = async (req, res) => {
     }
 
     const order = await Order.findById(id)
-      .populate('user', 'name email contact address')
+      .populate('user', 'name email contact address role')
       .populate('orderItems.product', 'name price unit images');
 
     if (!order) {
@@ -152,10 +180,19 @@ exports.getOrderById = async (req, res) => {
       });
     }
 
+    console.log(`📦 Order found with ${order.orderItems.length} items`);
+
+    // Log each item's farmer for debugging
+    order.orderItems.forEach((item, index) => {
+      console.log(`   Item ${index + 1}: ${item.name}, Farmer: ${item.farmer?.toString() || 'null'}`);
+    });
+
     // Verify farmer has products in this order
     const hasFarmerProduct = order.orderItems.some(
       item => item.farmer && item.farmer.toString() === userId.toString()
     );
+
+    console.log(`✅ Has farmer product: ${hasFarmerProduct}`);
 
     if (!hasFarmerProduct) {
       return res.status(403).json({
@@ -169,12 +206,21 @@ exports.getOrderById = async (req, res) => {
       item => item.farmer && item.farmer.toString() === userId.toString()
     );
 
+    console.log(`📦 Filtered to ${farmerItems.length} farmer items`);
+
+    // Calculate totals for farmer's items only
+    const itemsPrice = farmerItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const taxPrice = itemsPrice * 0.12;
+    const shippingPrice = order.shippingPrice || 50;
+    const totalPrice = itemsPrice + taxPrice + shippingPrice;
+
     const filteredOrder = {
       ...order.toObject(),
       orderItems: farmerItems,
-      itemsPrice: farmerItems.reduce((sum, item) => sum + (item.price * item.quantity), 0),
-      taxPrice: farmerItems.reduce((sum, item) => sum + (item.price * item.quantity * 0.12), 0),
-      totalPrice: farmerItems.reduce((sum, item) => sum + (item.price * item.quantity * 1.12), 0) + 50
+      itemsPrice: itemsPrice,
+      taxPrice: taxPrice,
+      shippingPrice: shippingPrice,
+      totalPrice: totalPrice
     };
 
     res.status(200).json({
@@ -199,6 +245,7 @@ exports.updateOrderStatus = async (req, res) => {
     const userId = req.user.id;
 
     console.log('📋 Updating order status for ID:', id, 'to:', status);
+    console.log(`👤 Farmer ID: ${userId}`);
 
     // Check if ID is valid ObjectId
     if (!id || id.length !== 24) {
@@ -223,9 +270,9 @@ exports.updateOrderStatus = async (req, res) => {
       });
     }
 
-    // Find order
+    // Find order with populated data
     const order = await Order.findById(id)
-      .populate('user', 'name email contact')
+      .populate('user', 'name email contact role')
       .populate('orderItems.product', 'name price unit');
 
     if (!order) {
@@ -281,9 +328,9 @@ exports.updateOrderStatus = async (req, res) => {
 
     console.log(`✅ Order ${id} status updated from "${oldStatus}" to "${status}"`);
 
-    // Return updated order
+    // Return updated order with populated data
     const updatedOrder = await Order.findById(id)
-      .populate('user', 'name email contact')
+      .populate('user', 'name email contact role')
       .populate('orderItems.product', 'name price unit images');
 
     res.status(200).json({

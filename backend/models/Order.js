@@ -140,11 +140,17 @@ const orderSchema = new mongoose.Schema({
     walletAmountUsed: Number,
     previousBalance: Number,
     newBalance: Number,
-    farmerDistribution: [farmerPaymentSchema] // Track payments to farmers
+    farmerDistribution: [farmerPaymentSchema]
   },
   
   // Track farmer payments separately for easier querying
   farmerPayments: [farmerPaymentSchema],
+  
+  // Flag to identify if order is from a farmer
+  isFarmerOrder: {
+    type: Boolean,
+    default: false
+  },
   
   orderStatus: {
     type: String,
@@ -214,6 +220,7 @@ orderSchema.pre('save', function(next) {
 orderSchema.index({ user: 1, createdAt: -1 });
 orderSchema.index({ orderStatus: 1 });
 orderSchema.index({ createdAt: -1 });
-orderSchema.index({ 'farmerPayments.farmerId': 1 }); // For farmer transaction queries
+orderSchema.index({ 'farmerPayments.farmerId': 1 });
+orderSchema.index({ isFarmerOrder: 1 });
 
 module.exports = mongoose.model('Order', orderSchema);

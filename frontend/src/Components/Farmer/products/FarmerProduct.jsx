@@ -291,8 +291,6 @@ const FarmerProduct = () => {
 
   // ── Navigation Handlers ──
   const handleProductClick = (product) => {
-    // Navigate to the product detail page with the product ID
-    // The route will determine which component to render based on the URL
     navigate(`/farmer/product/${product._id}`);
   };
 
@@ -414,6 +412,7 @@ const FarmerProduct = () => {
     }
   };
 
+  // ── UPDATED: Handle Buy Now - Navigates to Farmer Checkout ──
   const handleBuyNow = (e, product) => {
     e.stopPropagation();
     const token = localStorage.getItem('token');
@@ -423,9 +422,18 @@ const FarmerProduct = () => {
       }
       return;
     }
-    navigate('/checkout', { 
+    // Navigate to farmer checkout with product data
+    navigate('/farmer/checkout', { 
       state: { 
-        product: product,
+        product: {
+          ...product,
+          productId: product._id,
+          farmerId: product.farmer?._id || product.farmer,
+          farmerName: product.farmer?.name || 'Unknown Farmer',
+          farmerLocation: product.location || product.farmer?.location,
+          quantity: product.quantity || product.stock || 0,
+          stock: product.quantity || product.stock || 0
+        },
         quantity: 1,
         isSoloCheckout: true 
       } 

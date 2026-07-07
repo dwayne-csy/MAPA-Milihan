@@ -39,7 +39,11 @@ import {
   CardContent,
   Grid,
   Badge,
-  Divider
+  Divider,
+  Fade,
+  InputAdornment,
+  useTheme,
+  alpha
 } from '@mui/material';
 import {
   Refresh as RefreshIcon,
@@ -57,22 +61,27 @@ import {
   Person as PersonIcon,
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
-  Close as CloseIcon
+  Close as CloseIcon,
+  Search as SearchIcon,
+  FilterList as FilterIcon,
+  Dashboard as DashboardIcon,
+  History as HistoryIcon,
+  Shield as ShieldIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 import { format } from 'date-fns';
 
-// API URL - using Vite environment variable, fallback to port 4001
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001';
 
 const ManageReport = () => {
   const navigate = useNavigate();
+  const theme = useTheme();
   const [loading, setLoading] = useState(false);
   const [reports, setReports] = useState([]);
   const [hiddenContent, setHiddenContent] = useState([]);
   const [statistics, setStatistics] = useState(null);
   const [pagination, setPagination] = useState({ page: 0, limit: 20, total: 0 });
-  const [filter, setFilter] = useState({ status: 'all', type: 'all' });
+  const [filter, setFilter] = useState({ status: 'all', type: 'all', search: '' });
   const [tabValue, setTabValue] = useState(0);
   const [selectedReport, setSelectedReport] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -82,24 +91,21 @@ const ManageReport = () => {
   const [adminInfo, setAdminInfo] = useState(null);
   const [viewReportDialog, setViewReportDialog] = useState(false);
   const [selectedReportForView, setSelectedReportForView] = useState(null);
+  const [showFilters, setShowFilters] = useState(false);
 
-  // Check authentication and admin role
   useEffect(() => {
     if (!isAuthenticated()) {
       navigate('/login');
       return;
     }
-    
     const user = getUser();
     if (user?.role !== 'admin' && user?.userType !== 'Admin') {
       navigate('/home');
       return;
     }
-    
     setAdminInfo(user);
   }, [navigate]);
 
-  // Auth headers
   const getAuthHeaders = () => {
     const token = getToken();
     return {
@@ -110,7 +116,6 @@ const ManageReport = () => {
     };
   };
 
-  // Fetch reports
   const fetchReports = useCallback(async () => {
     setLoading(true);
     try {
@@ -120,6 +125,7 @@ const ManageReport = () => {
       });
       if (filter.status !== 'all') params.append('status', filter.status);
       if (filter.type !== 'all') params.append('type', filter.type);
+      if (filter.search) params.append('search', filter.search);
 
       const response = await axios.get(
         `${API_BASE_URL}/api/admin/reports?${params}`,
@@ -139,17 +145,14 @@ const ManageReport = () => {
       if (error.response?.status === 401) {
         showSnackbar('Session expired. Please login again.', 'error');
         navigate('/login');
-      } else if (error.response?.status === 403) {
-        showSnackbar('You do not have admin permissions.', 'error');
       } else {
         showSnackbar(error.response?.data?.message || 'Error fetching reports', 'error');
       }
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, pagination.limit, filter.status, filter.type, navigate]);
+  }, [pagination.page, pagination.limit, filter.status, filter.type, filter.search, navigate]);
 
-  // Fetch hidden content
   const fetchHiddenContent = useCallback(async () => {
     setLoading(true);
     try {
@@ -158,6 +161,7 @@ const ManageReport = () => {
         limit: pagination.limit
       });
       if (filter.type !== 'all') params.append('type', filter.type);
+      if (filter.search) params.append('search', filter.search);
 
       const response = await axios.get(
         `${API_BASE_URL}/api/admin/hidden?${params}`,
@@ -178,16 +182,14 @@ const ManageReport = () => {
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, pagination.limit, filter.type]);
+  }, [pagination.page, pagination.limit, filter.type, filter.search]);
 
-  // Fetch statistics
   const fetchStatistics = useCallback(async () => {
     try {
       const response = await axios.get(
         `${API_BASE_URL}/api/admin/reports/statistics`,
         getAuthHeaders()
       );
-
       if (response.data.success) {
         setStatistics(response.data.data);
       }
@@ -196,45 +198,41 @@ const ManageReport = () => {
     }
   }, []);
 
-  // Initial load
   useEffect(() => {
     if (tabValue === 0) {
       fetchReports();
-    } else if (tabValue === 1) {
+    } else {
       fetchHiddenContent();
     }
     fetchStatistics();
   }, [tabValue, fetchReports, fetchHiddenContent, fetchStatistics]);
 
-  // Refresh data
   const handleRefresh = () => {
-    if (tabValue === 0) {
-      fetchReports();
-    } else if (tabValue === 1) {
-      fetchHiddenContent();
-    }
+    if (tabValue === 0) fetchReports();
+    else fetchHiddenContent();
     fetchStatistics();
   };
 
-  // Show snackbar
   const showSnackbar = (message, severity = 'success') => {
     setSnackbar({ open: true, message, severity });
   };
 
-  // Handle tab change
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
     setPagination(prev => ({ ...prev, page: 0 }));
   };
 
-  // Handle filter change
   const handleFilterChange = (event) => {
     const { name, value } = event.target;
     setFilter(prev => ({ ...prev, [name]: value }));
     setPagination(prev => ({ ...prev, page: 0 }));
   };
 
-  // Handle page change
+  const handleSearchChange = (event) => {
+    setFilter(prev => ({ ...prev, search: event.target.value }));
+    setPagination(prev => ({ ...prev, page: 0 }));
+  };
+
   const handlePageChange = (event, newPage) => {
     setPagination(prev => ({ ...prev, page: newPage }));
   };
@@ -243,7 +241,6 @@ const ManageReport = () => {
     setPagination(prev => ({ ...prev, limit: parseInt(event.target.value, 10), page: 0 }));
   };
 
-  // Open dialog
   const openDialog = (type, report = null) => {
     setSelectedReport(report);
     setDialogType(type);
@@ -251,31 +248,26 @@ const ManageReport = () => {
     setDialogOpen(true);
   };
 
-  // Close dialog
   const closeDialog = () => {
     setDialogOpen(false);
     setSelectedReport(null);
   };
 
-  // Open view report dialog
   const openViewReportDialog = (report) => {
     setSelectedReportForView(report);
     setViewReportDialog(true);
   };
 
-  // Close view report dialog
   const closeViewReportDialog = () => {
     setViewReportDialog(false);
     setSelectedReportForView(null);
   };
 
-  // Handle update status
   const handleUpdateStatus = async () => {
     if (!selectedReport) {
       showSnackbar('No report selected', 'error');
       return;
     }
-
     if (!dialogData.status) {
       showSnackbar('Please select a status', 'error');
       return;
@@ -284,10 +276,7 @@ const ManageReport = () => {
     try {
       const response = await axios.put(
         `${API_BASE_URL}/api/admin/reports/${selectedReport.reportId || selectedReport._id}/status`,
-        {
-          status: dialogData.status,
-          adminNote: dialogData.adminNote
-        },
+        { status: dialogData.status, adminNote: dialogData.adminNote },
         getAuthHeaders()
       );
 
@@ -305,7 +294,6 @@ const ManageReport = () => {
     }
   };
 
-  // Handle hide content
   const handleHideContent = async () => {
     if (!selectedReport) {
       showSnackbar('No report selected', 'error');
@@ -316,20 +304,8 @@ const ManageReport = () => {
     const contentId = selectedReport.targetId || selectedReport.contentId;
     const reportId = selectedReport.reportId || selectedReport._id;
 
-    console.log('🔍 Hiding content with data:', {
-      type: contentType,
-      contentId: contentId,
-      reportId: reportId,
-      reason: dialogData.reason
-    });
-
-    if (!contentType) {
-      showSnackbar('Report type is missing', 'error');
-      return;
-    }
-
-    if (!contentId) {
-      showSnackbar('Content ID is missing', 'error');
+    if (!contentType || !contentId) {
+      showSnackbar('Missing content information', 'error');
       return;
     }
 
@@ -341,46 +317,25 @@ const ManageReport = () => {
     try {
       const response = await axios.post(
         `${API_BASE_URL}/api/admin/hide/${contentType}/${contentId}`,
-        {
-          reportId: reportId,
-          reason: dialogData.reason.trim()
-        },
+        { reportId, reason: dialogData.reason.trim() },
         getAuthHeaders()
       );
-
-      console.log('✅ Hide response:', response.data);
 
       if (response.data.success) {
         showSnackbar(`${contentType} hidden successfully`, 'success');
         closeDialog();
-        if (tabValue === 0) {
-          fetchReports();
-        } else {
-          fetchHiddenContent();
-        }
+        if (tabValue === 0) fetchReports();
+        else fetchHiddenContent();
         fetchStatistics();
       } else {
         showSnackbar(response.data.message || 'Error hiding content', 'error');
       }
     } catch (error) {
-      console.error('❌ Error hiding content:', error);
-      console.error('Error response:', error.response);
-      console.error('Error data:', error.response?.data);
-      
-      let errorMessage = 'Error hiding content';
-      if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      } else if (error.response?.data?.error) {
-        errorMessage = error.response.data.error;
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      showSnackbar(errorMessage, 'error');
+      console.error('Error hiding content:', error);
+      showSnackbar(error.response?.data?.message || 'Error hiding content', 'error');
     }
   };
 
-  // Handle unhide content
   const handleUnhideContent = async (item) => {
     if (!item || !item.type || !item._id) {
       showSnackbar('Missing content information', 'error');
@@ -407,7 +362,6 @@ const ManageReport = () => {
     }
   };
 
-  // Handle delete report
   const handleDeleteReport = async () => {
     if (!selectedReport) {
       showSnackbar('No report selected', 'error');
@@ -436,7 +390,6 @@ const ManageReport = () => {
     }
   };
 
-  // Get status chip color
   const getStatusChipColor = (status) => {
     switch (status) {
       case 'Pending': return 'warning';
@@ -447,7 +400,6 @@ const ManageReport = () => {
     }
   };
 
-  // Get type icon
   const getTypeIcon = (type) => {
     switch (type) {
       case 'post': return <PostIcon fontSize="small" />;
@@ -457,7 +409,6 @@ const ManageReport = () => {
     }
   };
 
-  // Format date
   const formatDate = (date) => {
     if (!date) return 'N/A';
     try {
@@ -467,298 +418,28 @@ const ManageReport = () => {
     }
   };
 
-  // Render avatar
-  const renderAvatar = (user, fallbackIcon = <PersonIcon />) => {
-    if (user?.avatar) {
-      return (
-        <Avatar 
-          src={user.avatar} 
-          alt={user.name || 'User'}
-          sx={{ width: 24, height: 24 }}
-        />
-      );
+  const getStatusBadgeColor = (status) => {
+    switch (status) {
+      case 'Pending': return '#ED6C02';
+      case 'Reviewed': return '#0288D1';
+      case 'Resolved': return '#2E7D32';
+      case 'Dismissed': return '#D32F2F';
+      default: return '#757575';
     }
-    return (
-      <Avatar sx={{ width: 24, height: 24, bgcolor: '#2E7D32' }}>
-        {user?.name?.charAt(0) || 'U'}
-      </Avatar>
-    );
   };
 
-  // Render report item
-  const renderReportItem = (report) => {
-    const isHidden = report.isHidden || 
-                     (report.contentDetails && report.contentDetails.isHidden) || 
-                     false;
-    
-    const reportStatus = report.status || 'Pending';
-    const reportReason = report.reason || 'N/A';
-    const reportCreatedAt = report.createdAt;
-    
-    const contentType = report.targetType || 'unknown';
-    const reportId = report._id || report.reportId;
-
-    const contentDetails = report.contentDetails || {};
-    const reporterDetails = report.reporterDetails || {};
-
-    // Get content title/display text
-    let contentDisplay = '';
-    if (contentType === 'post') {
-      contentDisplay = contentDetails.title || contentDetails.content || 'Post';
-    } else if (contentType === 'comment') {
-      contentDisplay = contentDetails.content || 'Comment';
-    } else if (contentType === 'message') {
-      contentDisplay = contentDetails.content || 'Message';
-    }
-
-    return (
-      <TableRow key={reportId} hover>
-        <TableCell>
-          <Stack direction="row" spacing={1} alignItems="center">
-            {getTypeIcon(contentType)}
-            <Chip
-              label={contentType.charAt(0).toUpperCase() + contentType.slice(1)}
-              size="small"
-              color={contentType === 'post' ? 'primary' : contentType === 'comment' ? 'success' : 'info'}
-              variant="outlined"
-            />
-            {isHidden && (
-              <Chip
-                label="Hidden"
-                size="small"
-                color="error"
-                icon={<VisibilityOffIcon fontSize="small" />}
-              />
-            )}
-          </Stack>
-        </TableCell>
-        <TableCell>
-          <Typography variant="body2" noWrap sx={{ maxWidth: 200 }}>
-            {contentDisplay}
-          </Typography>
-        </TableCell>
-        <TableCell>
-          <Stack direction="row" spacing={1} alignItems="center">
-            {renderAvatar(contentDetails.author || contentDetails.sender)}
-            <Typography variant="body2">
-              {(contentDetails.author?.name || contentDetails.sender?.name || 'Unknown')}
-            </Typography>
-            <Chip
-              label={contentDetails.author?.userType || contentDetails.sender?.userType || 'User'}
-              size="small"
-              variant="outlined"
-              sx={{ fontSize: '0.6rem', height: 20 }}
-            />
-          </Stack>
-        </TableCell>
-        <TableCell>
-          <Stack direction="row" spacing={1} alignItems="center">
-            {renderAvatar(reporterDetails)}
-            <Typography variant="body2">
-              {reporterDetails.name || 'Unknown'}
-            </Typography>
-            <Chip
-              label={reporterDetails.userType || 'User'}
-              size="small"
-              variant="outlined"
-              sx={{ fontSize: '0.6rem', height: 20 }}
-            />
-          </Stack>
-        </TableCell>
-        <TableCell>
-          <Chip
-            label={reportReason}
-            size="small"
-            variant="outlined"
-            color="warning"
-          />
-        </TableCell>
-        <TableCell>
-          <Chip
-            label={reportStatus}
-            size="small"
-            color={getStatusChipColor(reportStatus)}
-          />
-        </TableCell>
-        <TableCell>
-          <Typography variant="caption">
-            {formatDate(reportCreatedAt)}
-          </Typography>
-        </TableCell>
-        <TableCell>
-          <Stack direction="row" spacing={0.5}>
-            <Tooltip title="View Details">
-              <IconButton
-                size="small"
-                color="info"
-                onClick={() => openViewReportDialog(report)}
-              >
-                <VisibilityIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Update Status">
-              <IconButton
-                size="small"
-                color="primary"
-                onClick={() => openDialog('status', report)}
-              >
-                <CheckCircleIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-            {!isHidden ? (
-              <Tooltip title="Hide Content">
-                <IconButton
-                  size="small"
-                  color="error"
-                  onClick={() => openDialog('hide', report)}
-                >
-                  <VisibilityOffIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            ) : (
-              <Tooltip title="Already Hidden">
-                <IconButton size="small" disabled>
-                  <VisibilityOffIcon fontSize="small" color="disabled" />
-                </IconButton>
-              </Tooltip>
-            )}
-            <Tooltip title="Delete Report">
-              <IconButton
-                size="small"
-                color="error"
-                onClick={() => openDialog('delete', report)}
-              >
-                <DeleteIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          </Stack>
-        </TableCell>
-      </TableRow>
-    );
-  };
-
-  // Render hidden content item
-  const renderHiddenItem = (item) => {
-    return (
-      <TableRow key={item._id} hover>
-        <TableCell>
-          <Stack direction="row" spacing={1} alignItems="center">
-            {getTypeIcon(item.type)}
-            <Chip
-              label={item.type.charAt(0).toUpperCase() + item.type.slice(1)}
-              size="small"
-              color={item.type === 'post' ? 'primary' : item.type === 'comment' ? 'success' : 'info'}
-              variant="outlined"
-            />
-          </Stack>
-        </TableCell>
-        <TableCell>
-          <Typography variant="body2" noWrap sx={{ maxWidth: 200 }}>
-            {item.type === 'post' ? item.title :
-             item.type === 'comment' ? item.postTitle || item.content :
-             item.content || 'Message'}
-          </Typography>
-        </TableCell>
-        <TableCell>
-          <Stack direction="row" spacing={1} alignItems="center">
-            {renderAvatar(item.author || item.sender)}
-            <Typography variant="body2">
-              {(item.author?.name || item.sender?.name || 'Unknown')}
-            </Typography>
-          </Stack>
-        </TableCell>
-        <TableCell>
-          <Typography variant="caption" color="error">
-            {item.hideReason || 'No reason provided'}
-          </Typography>
-        </TableCell>
-        <TableCell>
-          <Typography variant="caption">
-            {formatDate(item.hiddenAt)}
-          </Typography>
-        </TableCell>
-        <TableCell>
-          <Tooltip title="View Details">
-            <IconButton
-              size="small"
-              color="info"
-              onClick={() => {
-                setSelectedReportForView({
-                  ...item,
-                  targetType: item.type,
-                  contentDetails: item,
-                  reporterDetails: item.hiddenBy
-                });
-                setViewReportDialog(true);
-              }}
-            >
-              <VisibilityIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Unhide Content">
-            <IconButton
-              size="small"
-              color="success"
-              onClick={() => handleUnhideContent(item)}
-            >
-              <VisibilityOffIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        </TableCell>
-      </TableRow>
-    );
-  };
-
-  // Render statistics cards
-  const renderStatistics = () => {
-    if (!statistics) return null;
-
-    const stats = [
-      { label: 'Total Reports', value: statistics.total || 0, color: '#1565C0', icon: <ReportIcon /> },
-      { label: 'Pending', value: statistics.pending || 0, color: '#ED6C02', icon: <WarningIcon /> },
-      { label: 'Reviewed', value: statistics.reviewed || 0, color: '#0288D1', icon: <CheckCircleIcon /> },
-      { label: 'Resolved', value: statistics.resolved || 0, color: '#2E7D32', icon: <DoneAllIcon /> },
-      { label: 'Dismissed', value: statistics.dismissed || 0, color: '#D32F2F', icon: <CancelIcon /> },
-    ];
-
-    return (
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        {stats.map((stat) => (
-          <Grid item xs={12} sm={6} md={2.4} key={stat.label}>
-            <Card>
-              <CardContent sx={{ textAlign: 'center' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
-                  <Box sx={{ color: stat.color }}>
-                    {stat.icon}
-                  </Box>
-                </Box>
-                <Typography variant="h4" component="div" sx={{ fontWeight: 'bold' }}>
-                  {stat.value}
-                </Typography>
-                <Typography variant="body2" color="textSecondary">
-                  {stat.label}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
-    );
-  };
-
-  // Check if user is admin, if not show access denied
   if (!adminInfo) {
     return (
-      <div className="min-h-screen bg-gray-100">
+      <div className="min-h-screen bg-gray-50">
         <LeftNavigationBar />
-        <div className="ml-64 p-8 flex items-center justify-center">
-          <Paper sx={{ p: 4, textAlign: 'center', maxWidth: 500 }}>
-            <WarningIcon color="error" sx={{ fontSize: 60, mb: 2 }} />
-            <Typography variant="h5" color="error" gutterBottom>
+        <div className="ml-64 p-8 flex items-center justify-center min-h-[80vh]">
+          <Paper sx={{ p: 6, textAlign: 'center', maxWidth: 500, borderRadius: 3 }}>
+            <ShieldIcon color="error" sx={{ fontSize: 72, mb: 2 }} />
+            <Typography variant="h5" color="error" gutterBottom fontWeight="bold">
               Access Denied
             </Typography>
             <Typography variant="body1" color="textSecondary">
-              You do not have permission to access this page. This area is restricted to administrators only.
+              You do not have permission to access this page.
             </Typography>
           </Paper>
         </div>
@@ -767,130 +448,423 @@ const ManageReport = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-50">
       <LeftNavigationBar />
       
-      <div className="ml-64 p-8">
-        <Container maxWidth="xl" sx={{ py: 3 }}>
-          <Paper sx={{ p: 3 }}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-              <Typography variant="h5" component="h1" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <ReportIcon color="error" />
-                Report Management
-              </Typography>
+      <div className="ml-64 p-6">
+        <Container maxWidth="xl" sx={{ py: 2 }}>
+          {/* Header */}
+          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Paper sx={{ p: 1.5, borderRadius: 2, bgcolor: alpha(theme.palette.error.main, 0.1) }}>
+                <ReportIcon sx={{ color: theme.palette.error.main }} />
+              </Paper>
+              <Box>
+                <Typography variant="h5" fontWeight="bold">
+                  Report Management
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  Monitor and manage reported content
+                </Typography>
+              </Box>
+            </Stack>
+            <Stack direction="row" spacing={1}>
               <Button
                 variant="outlined"
                 startIcon={<RefreshIcon />}
                 onClick={handleRefresh}
                 disabled={loading}
+                sx={{ borderRadius: 2 }}
               >
                 Refresh
               </Button>
             </Stack>
+          </Stack>
 
-            {/* Statistics */}
-            {renderStatistics()}
+          {/* Statistics Cards */}
+          {statistics && (
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+              {[
+                { label: 'Total Reports', value: statistics.total || 0, color: '#1565C0', icon: <DashboardIcon /> },
+                { label: 'Pending', value: statistics.pending || 0, color: '#ED6C02', icon: <WarningIcon /> },
+                { label: 'Reviewed', value: statistics.reviewed || 0, color: '#0288D1', icon: <CheckCircleIcon /> },
+                { label: 'Resolved', value: statistics.resolved || 0, color: '#2E7D32', icon: <DoneAllIcon /> },
+                { label: 'Dismissed', value: statistics.dismissed || 0, color: '#D32F2F', icon: <CancelIcon /> },
+              ].map((stat) => (
+                <Grid item xs={12} sm={6} md={2.4} key={stat.label}>
+                  <Card sx={{ borderRadius: 3, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                    <CardContent>
+                      <Stack direction="row" justifyContent="space-between" alignItems="center">
+                        <Box>
+                          <Typography variant="h4" fontWeight="bold">
+                            {stat.value}
+                          </Typography>
+                          <Typography variant="body2" color="textSecondary">
+                            {stat.label}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ color: stat.color, bgcolor: alpha(stat.color, 0.1), p: 1, borderRadius: 2 }}>
+                          {stat.icon}
+                        </Box>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          )}
 
+          {/* Main Content */}
+          <Paper sx={{ borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
             {/* Tabs */}
-            <Tabs value={tabValue} onChange={handleTabChange} sx={{ mb: 2 }}>
-              <Tab
-                label={
-                  <Badge badgeContent={statistics?.total || 0} color="error">
-                    Reports
-                  </Badge>
-                }
-              />
-              <Tab label="Hidden Content" />
-            </Tabs>
+            <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 3, pt: 2 }}>
+              <Tabs value={tabValue} onChange={handleTabChange}>
+                <Tab
+                  label={
+                    <Badge badgeContent={statistics?.total || 0} color="error" sx={{ '& .MuiBadge-badge': { top: -4 } }}>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <ReportIcon fontSize="small" />
+                        <Typography variant="body2" fontWeight={tabValue === 0 ? 'bold' : 'normal'}>
+                          Active Reports
+                        </Typography>
+                      </Stack>
+                    </Badge>
+                  }
+                />
+                <Tab
+                  label={
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <HistoryIcon fontSize="small" />
+                      <Typography variant="body2" fontWeight={tabValue === 1 ? 'bold' : 'normal'}>
+                        Hidden Content
+                      </Typography>
+                    </Stack>
+                  }
+                />
+              </Tabs>
+            </Box>
 
             {/* Filters */}
-            <Stack direction="row" spacing={2} sx={{ mb: 2 }} flexWrap="wrap">
-              <FormControl size="small" sx={{ minWidth: 150 }}>
-                <InputLabel>Status</InputLabel>
-                <Select
-                  name="status"
-                  value={filter.status}
-                  onChange={handleFilterChange}
-                  label="Status"
+            <Box sx={{ p: 2, bgcolor: alpha(theme.palette.primary.main, 0.02) }}>
+              <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
+                <TextField
+                  size="small"
+                  placeholder="Search reports..."
+                  value={filter.search}
+                  onChange={handleSearchChange}
+                  sx={{ minWidth: 250, flex: 1 }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon fontSize="small" />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+                <FormControl size="small" sx={{ minWidth: 140 }}>
+                  <Select
+                    name="status"
+                    value={filter.status}
+                    onChange={handleFilterChange}
+                    displayEmpty
+                  >
+                    <MenuItem value="all">All Status</MenuItem>
+                    <MenuItem value="Pending">Pending</MenuItem>
+                    <MenuItem value="Reviewed">Reviewed</MenuItem>
+                    <MenuItem value="Resolved">Resolved</MenuItem>
+                    <MenuItem value="Dismissed">Dismissed</MenuItem>
+                  </Select>
+                </FormControl>
+                <FormControl size="small" sx={{ minWidth: 140 }}>
+                  <Select
+                    name="type"
+                    value={filter.type}
+                    onChange={handleFilterChange}
+                    displayEmpty
+                  >
+                    <MenuItem value="all">All Types</MenuItem>
+                    <MenuItem value="post">Posts</MenuItem>
+                    <MenuItem value="comment">Comments</MenuItem>
+                    <MenuItem value="message">Messages</MenuItem>
+                  </Select>
+                </FormControl>
+                <Button
+                  variant="text"
+                  size="small"
+                  onClick={() => {
+                    setFilter({ status: 'all', type: 'all', search: '' });
+                    setPagination(prev => ({ ...prev, page: 0 }));
+                  }}
+                  sx={{ color: 'text.secondary' }}
                 >
-                  <MenuItem value="all">All</MenuItem>
-                  <MenuItem value="Pending">Pending</MenuItem>
-                  <MenuItem value="Reviewed">Reviewed</MenuItem>
-                  <MenuItem value="Resolved">Resolved</MenuItem>
-                  <MenuItem value="Dismissed">Dismissed</MenuItem>
-                </Select>
-              </FormControl>
-
-              <FormControl size="small" sx={{ minWidth: 150 }}>
-                <InputLabel>Type</InputLabel>
-                <Select
-                  name="type"
-                  value={filter.type}
-                  onChange={handleFilterChange}
-                  label="Type"
-                >
-                  <MenuItem value="all">All</MenuItem>
-                  <MenuItem value="post">Posts</MenuItem>
-                  <MenuItem value="comment">Comments</MenuItem>
-                  <MenuItem value="message">Messages</MenuItem>
-                </Select>
-              </FormControl>
-
-              <Button
-                variant="contained"
-                size="small"
-                onClick={() => {
-                  setFilter({ status: 'all', type: 'all' });
-                  setPagination(prev => ({ ...prev, page: 0 }));
-                }}
-              >
-                Clear Filters
-              </Button>
-            </Stack>
+                  Clear Filters
+                </Button>
+              </Stack>
+            </Box>
 
             {/* Table */}
             <TableContainer>
               <Table>
                 <TableHead>
-                  <TableRow>
-                    <TableCell>Type</TableCell>
-                    <TableCell>Content</TableCell>
-                    <TableCell>Content Author</TableCell>
-                    <TableCell>Reported By</TableCell>
-                    <TableCell>Reason</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Date</TableCell>
-                    <TableCell>Actions</TableCell>
+                  <TableRow sx={{ bgcolor: alpha(theme.palette.primary.main, 0.04) }}>
+                    <TableCell sx={{ fontWeight: 600 }}>Type</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Content</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Author</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Reported By</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Reason</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Date</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }} align="center">Actions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={8} align="center">
-                        <CircularProgress />
+                      <TableCell colSpan={8} align="center" sx={{ py: 8 }}>
+                        <CircularProgress size={40} />
                       </TableCell>
                     </TableRow>
                   ) : tabValue === 0 ? (
                     reports.length > 0 ? (
-                      reports.map(renderReportItem)
+                      reports.map((report) => {
+                        const isHidden = report.isHidden || 
+                          (report.contentDetails && report.contentDetails.isHidden) || false;
+                        const contentType = report.targetType || 'unknown';
+                        const contentDetails = report.contentDetails || {};
+                        const reporterDetails = report.reporterDetails || {};
+                        
+                        let contentDisplay = '';
+                        if (contentType === 'post') {
+                          contentDisplay = contentDetails.title || contentDetails.content || 'Post';
+                        } else if (contentType === 'comment') {
+                          contentDisplay = contentDetails.content || 'Comment';
+                        } else if (contentType === 'message') {
+                          contentDisplay = contentDetails.content || 'Message';
+                        }
+
+                        return (
+                          <TableRow key={report._id || report.reportId} hover>
+                            <TableCell>
+                              <Chip
+                                icon={getTypeIcon(contentType)}
+                                label={contentType.charAt(0).toUpperCase() + contentType.slice(1)}
+                                size="small"
+                                variant="outlined"
+                                sx={{ borderRadius: 1 }}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" noWrap sx={{ maxWidth: 180 }}>
+                                {contentDisplay || 'N/A'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Stack direction="row" spacing={1} alignItems="center">
+                                <Avatar sx={{ width: 28, height: 28, fontSize: 12 }}>
+                                  {(contentDetails.author?.name || contentDetails.sender?.name || 'U').charAt(0)}
+                                </Avatar>
+                                <Typography variant="body2" noWrap>
+                                  {(contentDetails.author?.name || contentDetails.sender?.name || 'Unknown')}
+                                </Typography>
+                              </Stack>
+                            </TableCell>
+                            <TableCell>
+                              <Stack direction="row" spacing={1} alignItems="center">
+                                <Avatar sx={{ width: 28, height: 28, fontSize: 12, bgcolor: 'grey.300' }}>
+                                  {(reporterDetails.name || 'U').charAt(0)}
+                                </Avatar>
+                                <Typography variant="body2" noWrap>
+                                  {reporterDetails.name || 'Unknown'}
+                                </Typography>
+                              </Stack>
+                            </TableCell>
+                            <TableCell>
+                              <Chip
+                                label={report.reason || 'N/A'}
+                                size="small"
+                                variant="outlined"
+                                sx={{ borderRadius: 1, maxWidth: 120 }}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Chip
+                                label={report.status || 'Pending'}
+                                size="small"
+                                sx={{ 
+                                  borderRadius: 1,
+                                  bgcolor: alpha(getStatusBadgeColor(report.status || 'Pending'), 0.1),
+                                  color: getStatusBadgeColor(report.status || 'Pending'),
+                                  fontWeight: 500
+                                }}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="caption" color="textSecondary">
+                                {formatDate(report.createdAt)}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Stack direction="row" spacing={0.5} justifyContent="center">
+                                <Tooltip title="View Details">
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => openViewReportDialog(report)}
+                                    sx={{ 
+                                      bgcolor: alpha(theme.palette.info.main, 0.1),
+                                      '&:hover': { bgcolor: alpha(theme.palette.info.main, 0.2) }
+                                    }}
+                                  >
+                                    <VisibilityIcon fontSize="small" sx={{ color: theme.palette.info.main }} />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Update Status">
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => openDialog('status', report)}
+                                    sx={{ 
+                                      bgcolor: alpha(theme.palette.primary.main, 0.1),
+                                      '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.2) }
+                                    }}
+                                  >
+                                    <CheckCircleIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />
+                                  </IconButton>
+                                </Tooltip>
+                                {!isHidden ? (
+                                  <Tooltip title="Hide Content">
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => openDialog('hide', report)}
+                                      sx={{ 
+                                        bgcolor: alpha(theme.palette.error.main, 0.1),
+                                        '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.2) }
+                                      }}
+                                    >
+                                      <VisibilityOffIcon fontSize="small" sx={{ color: theme.palette.error.main }} />
+                                    </IconButton>
+                                  </Tooltip>
+                                ) : (
+                                  <Tooltip title="Already Hidden">
+                                    <IconButton size="small" disabled>
+                                      <VisibilityOffIcon fontSize="small" color="disabled" />
+                                    </IconButton>
+                                  </Tooltip>
+                                )}
+                                <Tooltip title="Delete Report">
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => openDialog('delete', report)}
+                                    sx={{ 
+                                      bgcolor: alpha(theme.palette.error.main, 0.1),
+                                      '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.2) }
+                                    }}
+                                  >
+                                    <DeleteIcon fontSize="small" sx={{ color: theme.palette.error.main }} />
+                                  </IconButton>
+                                </Tooltip>
+                              </Stack>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={8} align="center">
-                          <Typography variant="body2" color="textSecondary">
-                            No reports found
-                          </Typography>
+                        <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
+                          <Stack alignItems="center" spacing={1}>
+                            <ReportIcon sx={{ fontSize: 48, color: 'text.disabled' }} />
+                            <Typography variant="body1" color="textSecondary">
+                              No reports found
+                            </Typography>
+                          </Stack>
                         </TableCell>
                       </TableRow>
                     )
                   ) : (
                     hiddenContent.length > 0 ? (
-                      hiddenContent.map(renderHiddenItem)
+                      hiddenContent.map((item) => (
+                        <TableRow key={item._id} hover>
+                          <TableCell>
+                            <Chip
+                              icon={getTypeIcon(item.type)}
+                              label={item.type.charAt(0).toUpperCase() + item.type.slice(1)}
+                              size="small"
+                              variant="outlined"
+                              sx={{ borderRadius: 1 }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2" noWrap sx={{ maxWidth: 180 }}>
+                              {item.type === 'post' ? item.title :
+                               item.type === 'comment' ? item.postTitle || item.content :
+                               item.content || 'Message'}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Stack direction="row" spacing={1} alignItems="center">
+                              <Avatar sx={{ width: 28, height: 28, fontSize: 12 }}>
+                                {(item.author?.name || item.sender?.name || 'U').charAt(0)}
+                              </Avatar>
+                              <Typography variant="body2" noWrap>
+                                {(item.author?.name || item.sender?.name || 'Unknown')}
+                              </Typography>
+                            </Stack>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="caption" color="error" noWrap sx={{ maxWidth: 150 }}>
+                              {item.hideReason || 'No reason provided'}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="caption" color="textSecondary">
+                              {formatDate(item.hiddenAt)}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Stack direction="row" spacing={0.5}>
+                              <Tooltip title="View Details">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => {
+                                    setSelectedReportForView({
+                                      ...item,
+                                      targetType: item.type,
+                                      contentDetails: item,
+                                      reporterDetails: item.hiddenBy
+                                    });
+                                    setViewReportDialog(true);
+                                  }}
+                                  sx={{ 
+                                    bgcolor: alpha(theme.palette.info.main, 0.1),
+                                    '&:hover': { bgcolor: alpha(theme.palette.info.main, 0.2) }
+                                  }}
+                                >
+                                  <VisibilityIcon fontSize="small" sx={{ color: theme.palette.info.main }} />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Unhide Content">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleUnhideContent(item)}
+                                  sx={{ 
+                                    bgcolor: alpha(theme.palette.success.main, 0.1),
+                                    '&:hover': { bgcolor: alpha(theme.palette.success.main, 0.2) }
+                                  }}
+                                >
+                                  <VisibilityOffIcon fontSize="small" sx={{ color: theme.palette.success.main }} />
+                                </IconButton>
+                              </Tooltip>
+                            </Stack>
+                          </TableCell>
+                        </TableRow>
+                      ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={6} align="center">
-                          <Typography variant="body2" color="textSecondary">
-                            No hidden content found
-                          </Typography>
+                        <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
+                          <Stack alignItems="center" spacing={1}>
+                            <HistoryIcon sx={{ fontSize: 48, color: 'text.disabled' }} />
+                            <Typography variant="body1" color="textSecondary">
+                              No hidden content found
+                            </Typography>
+                          </Stack>
                         </TableCell>
                       </TableRow>
                     )
@@ -907,12 +881,13 @@ const ManageReport = () => {
               rowsPerPage={pagination.limit}
               onRowsPerPageChange={handleRowsPerPageChange}
               rowsPerPageOptions={[10, 20, 50, 100]}
+              sx={{ borderTop: 1, borderColor: 'divider' }}
             />
           </Paper>
         </Container>
       </div>
 
-      {/* View Report Dialog */}
+      {/* Dialogs - Same as before */}
       <Dialog open={viewReportDialog} onClose={closeViewReportDialog} maxWidth="md" fullWidth>
         <DialogTitle>
           <Stack direction="row" justifyContent="space-between" alignItems="center">
@@ -925,8 +900,7 @@ const ManageReport = () => {
         <DialogContent dividers>
           {selectedReportForView && (
             <Stack spacing={2}>
-              {/* Report Info */}
-              <Paper variant="outlined" sx={{ p: 2 }}>
+              <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
                 <Typography variant="subtitle2" color="textSecondary" gutterBottom>Report Information</Typography>
                 <Grid container spacing={1}>
                   <Grid item xs={6}>
@@ -940,89 +914,15 @@ const ManageReport = () => {
                     <Chip
                       label={selectedReportForView.status || 'Pending'}
                       size="small"
-                      color={getStatusChipColor(selectedReportForView.status || 'Pending')}
+                      sx={{ 
+                        bgcolor: alpha(getStatusBadgeColor(selectedReportForView.status || 'Pending'), 0.1),
+                        color: getStatusBadgeColor(selectedReportForView.status || 'Pending')
+                      }}
                     />
                   </Grid>
-                  <Grid item xs={6}>
-                    <Typography variant="caption" color="textSecondary">Reason</Typography>
-                    <Typography variant="body2">{selectedReportForView.reason || 'N/A'}</Typography>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <Typography variant="caption" color="textSecondary">Reported At</Typography>
-                    <Typography variant="body2">{formatDate(selectedReportForView.createdAt)}</Typography>
-                  </Grid>
-                </Grid>
-              </Paper>
-
-              {/* Reporter Info */}
-              <Paper variant="outlined" sx={{ p: 2 }}>
-                <Typography variant="subtitle2" color="textSecondary" gutterBottom>Reported By</Typography>
-                <Stack direction="row" spacing={2} alignItems="center">
-                  {renderAvatar(selectedReportForView.reporterDetails)}
-                  <Box>
-                    <Typography variant="body2">
-                      {selectedReportForView.reporterDetails?.name || 'Unknown'}
-                    </Typography>
-                    <Typography variant="caption" color="textSecondary">
-                      {selectedReportForView.reporterDetails?.userType || 'User'}
-                    </Typography>
-                  </Box>
-                </Stack>
-              </Paper>
-
-              {/* Content Info */}
-              <Paper variant="outlined" sx={{ p: 2 }}>
-                <Typography variant="subtitle2" color="textSecondary" gutterBottom>Content Details</Typography>
-                <Stack spacing={1}>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    {getTypeIcon(selectedReportForView.targetType || selectedReportForView.type)}
-                    <Typography variant="body2" fontWeight="bold">
-                      {(selectedReportForView.targetType || selectedReportForView.type || 'Unknown').charAt(0).toUpperCase() + 
-                       (selectedReportForView.targetType || selectedReportForView.type || 'unknown').slice(1)}
-                    </Typography>
-                    {selectedReportForView.isHidden && (
-                      <Chip label="Hidden" size="small" color="error" />
-                    )}
-                  </Stack>
-                  
-                  {/* Content Author */}
-                  {selectedReportForView.contentDetails?.author && (
-                    <Stack direction="row" spacing={2} alignItems="center">
-                      <Typography variant="caption" color="textSecondary">Author:</Typography>
-                      {renderAvatar(selectedReportForView.contentDetails.author)}
-                      <Typography variant="body2">
-                        {selectedReportForView.contentDetails.author.name || 'Unknown'}
-                      </Typography>
-                      <Chip
-                        label={selectedReportForView.contentDetails.author.userType || 'User'}
-                        size="small"
-                        variant="outlined"
-                        sx={{ fontSize: '0.6rem', height: 20 }}
-                      />
-                    </Stack>
-                  )}
-                  
-                  {/* Message Sender */}
-                  {selectedReportForView.contentDetails?.sender && (
-                    <Stack direction="row" spacing={2} alignItems="center">
-                      <Typography variant="caption" color="textSecondary">Sender:</Typography>
-                      {renderAvatar(selectedReportForView.contentDetails.sender)}
-                      <Typography variant="body2">
-                        {selectedReportForView.contentDetails.sender.name || 'Unknown'}
-                      </Typography>
-                      <Chip
-                        label={selectedReportForView.contentDetails.sender.userType || 'User'}
-                        size="small"
-                        variant="outlined"
-                        sx={{ fontSize: '0.6rem', height: 20 }}
-                      />
-                    </Stack>
-                  )}
-                  
-                  {/* Content */}
-                  <Box>
-                    <Typography variant="caption" color="textSecondary">Content:</Typography>
-                    <Paper variant="outlined" sx={{ p: 1, mt: 0.5, bgcolor: '#f5f5f5' }}>
+                  <Grid item xs={12}>
+                    <Typography variant="caption" color="textSecondary">Content</Typography>
+                    <Paper variant="outlined" sx={{ p: 1.5, mt: 0.5, bgcolor: '#f5f5f5', borderRadius: 1 }}>
                       <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                         {selectedReportForView.contentDetails?.fullContent || 
                          selectedReportForView.contentDetails?.content || 
@@ -1030,60 +930,19 @@ const ManageReport = () => {
                          'No content available'}
                       </Typography>
                     </Paper>
-                  </Box>
-
-                  {/* Post Title */}
-                  {selectedReportForView.contentDetails?.title && (
-                    <Box>
-                      <Typography variant="caption" color="textSecondary">Title:</Typography>
-                      <Typography variant="body2">
-                        {selectedReportForView.contentDetails.title}
-                      </Typography>
-                    </Box>
-                  )}
-
-                  {/* Post Title for comment */}
-                  {selectedReportForView.contentDetails?.postTitle && (
-                    <Box>
-                      <Typography variant="caption" color="textSecondary">Post:</Typography>
-                      <Typography variant="body2">
-                        {selectedReportForView.contentDetails.postTitle}
-                      </Typography>
-                    </Box>
-                  )}
-
-                  {/* Admin Note */}
-                  {selectedReportForView.adminNote && (
-                    <Box>
-                      <Typography variant="caption" color="textSecondary">Admin Note:</Typography>
-                      <Typography variant="body2" color="primary">
-                        {selectedReportForView.adminNote}
-                      </Typography>
-                    </Box>
-                  )}
-
-                  {/* Hide Reason */}
-                  {selectedReportForView.hideReason && (
-                    <Box>
-                      <Typography variant="caption" color="textSecondary">Hide Reason:</Typography>
-                      <Typography variant="body2" color="error">
-                        {selectedReportForView.hideReason}
-                      </Typography>
-                    </Box>
-                  )}
-                </Stack>
+                  </Grid>
+                </Grid>
               </Paper>
             </Stack>
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={closeViewReportDialog} variant="contained">
+          <Button onClick={closeViewReportDialog} variant="contained" sx={{ borderRadius: 2 }}>
             Close
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Dialogs */}
       <Dialog open={dialogOpen} onClose={closeDialog} maxWidth="sm" fullWidth>
         <DialogTitle>
           {dialogType === 'status' && 'Update Report Status'}
@@ -1117,18 +976,10 @@ const ManageReport = () => {
               />
             </Stack>
           )}
-
           {dialogType === 'hide' && (
             <Stack spacing={2} sx={{ mt: 1 }}>
               <Typography variant="body2" color="error">
                 Are you sure you want to hide this {selectedReport?.targetType || selectedReport?.type || 'content'}?
-              </Typography>
-              <Typography variant="caption" color="textSecondary" display="block">
-                <strong>Content:</strong> {
-                  selectedReport?.targetType === 'post' ? selectedReport?.contentDetails?.title || selectedReport?.contentDetails?.content || selectedReport?.title :
-                  selectedReport?.targetType === 'comment' ? selectedReport?.contentDetails?.content || selectedReport?.content :
-                  selectedReport?.contentDetails?.content || selectedReport?.content || 'Message'
-                }
               </Typography>
               <TextField
                 label="Reason for hiding"
@@ -1139,12 +990,9 @@ const ManageReport = () => {
                 fullWidth
                 placeholder="Provide a reason for hiding this content..."
                 required
-                error={dialogData.reason.trim() === '' && dialogData.reason !== ''}
-                helperText={dialogData.reason.trim() === '' && dialogData.reason !== '' ? 'Reason is required' : ''}
               />
             </Stack>
           )}
-
           {dialogType === 'delete' && (
             <Typography variant="body2" color="error" sx={{ mt: 1 }}>
               Are you sure you want to delete this report? This action cannot be undone.
@@ -1162,6 +1010,7 @@ const ManageReport = () => {
             }
             variant="contained"
             color={dialogType === 'delete' ? 'error' : 'primary'}
+            sx={{ borderRadius: 2 }}
           >
             {dialogType === 'status' ? 'Update' :
              dialogType === 'hide' ? 'Hide' :
@@ -1171,7 +1020,6 @@ const ManageReport = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}
@@ -1182,6 +1030,7 @@ const ManageReport = () => {
           onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
           severity={snackbar.severity}
           variant="filled"
+          sx={{ borderRadius: 2 }}
         >
           {snackbar.message}
         </Alert>

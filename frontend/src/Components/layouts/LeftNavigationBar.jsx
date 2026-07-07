@@ -35,16 +35,6 @@ const LeftNavigationBar = () => {
       active: location.pathname === '/admin/manage-report'
     },
     { 
-      label: 'Contacts', 
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-        </svg>
-      ),
-      path: '/admin/contacts',
-      active: location.pathname === '/admin/contacts'
-    },
-    { 
       label: 'Logout', 
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -68,7 +58,7 @@ const LeftNavigationBar = () => {
           left: 0;
           top: 0;
           height: 100vh;
-          background: linear-gradient(180deg, #1e3a5f 0%, #0f2b45 100%);
+          background: linear-gradient(180deg, #059669 0%, #047857 100%);
           color: white;
           transition: width 0.3s ease;
           z-index: 1000;
@@ -146,7 +136,7 @@ const LeftNavigationBar = () => {
         .nav-link.active {
           background: rgba(255, 255, 255, 0.15);
           color: white;
-          border-left: 3px solid #3b82f6;
+          border-left: 3px solid #34d399;
         }
 
         .nav-link.logout {

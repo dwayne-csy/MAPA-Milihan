@@ -14,7 +14,8 @@ exports.checkout = async (req, res) => {
       paymentMethod = 'Cash on Delivery', 
       address: providedAddress,
       shippingDistance = 5,
-      shippingCost = 150
+      shippingCost = 150,
+      isFarmer = false
     } = req.body;
 
     // Fetch user
@@ -46,7 +47,7 @@ exports.checkout = async (req, res) => {
     // Validate stock and prepare order items
     const orderItems = [];
     let itemsPrice = 0;
-    const farmerPayments = {}; // Track payments per farmer
+    const farmerPayments = {};
 
     for (const item of cart.items) {
       const product = item.product;
@@ -67,7 +68,6 @@ exports.checkout = async (req, res) => {
 
       const itemTotal = product.price * item.quantity;
       
-      // Track farmer payments
       const farmerId = product.farmer ? product.farmer.toString() : null;
       if (farmerId) {
         if (!farmerPayments[farmerId]) {
@@ -102,16 +102,14 @@ exports.checkout = async (req, res) => {
       itemsPrice += product.price * item.quantity;
     }
 
-    // Calculate totals
     const shippingPrice = shippingCost || 50;
     const totalPrice = itemsPrice + shippingPrice;
 
-    // Handle wallet payment
     let paymentStatus = 'Pending';
     let paymentDetails = {};
+    let farmerDistribution = [];
 
     if (paymentMethod === 'Wallet') {
-      // Check if user has sufficient balance
       if (user.walletBalance < totalPrice) {
         return res.status(400).json({
           success: false,
@@ -119,18 +117,14 @@ exports.checkout = async (req, res) => {
         });
       }
 
-      // Deduct from user's wallet
       const previousBalance = user.walletBalance;
       await user.deductWalletBalance(totalPrice);
       
-      // ========== DISTRIBUTE PAYMENTS TO FARMERS ==========
-      const farmerDistribution = [];
       for (const farmerId in farmerPayments) {
         const farmerData = farmerPayments[farmerId];
         const farmer = await User.findById(farmerId);
         
         if (farmer) {
-          // Add the amount to farmer's wallet
           await farmer.addWalletBalance(farmerData.amount);
           
           farmerDistribution.push({
@@ -152,11 +146,10 @@ exports.checkout = async (req, res) => {
         previousBalance: previousBalance,
         newBalance: user.walletBalance,
         paymentDate: new Date(),
-        farmerDistribution: farmerDistribution // Track which farmers got paid
+        farmerDistribution: farmerDistribution
       };
     }
 
-    // Create shipping info
     let shippingInfo;
     if (providedAddress && providedAddress.city && providedAddress.barangay) {
       shippingInfo = {
@@ -184,7 +177,6 @@ exports.checkout = async (req, res) => {
       };
     }
 
-    // Create order
     const order = await Order.create({
       user: userId,
       orderItems,
@@ -198,10 +190,10 @@ exports.checkout = async (req, res) => {
       orderStatus: 'Processing',
       paymentMethod: paymentMethod === 'Wallet' ? 'Wallet' : 'Cash on Delivery',
       shippingDistance: shippingDistance || 0,
-      farmerPayments: farmerDistribution // Store farmer payment distribution
+      farmerPayments: farmerDistribution,
+      isFarmerOrder: isFarmer
     });
 
-    // Decrease stock for each product
     for (const item of cart.items) {
       const product = await Product.findById(item.product._id);
       if (product) {
@@ -211,12 +203,10 @@ exports.checkout = async (req, res) => {
       }
     }
 
-    // Clear user's cart
     cart.items = [];
     await cart.save();
     console.log('🗑️ Cart cleared after checkout');
 
-    // Populate order with user and product details
     const populatedOrder = await Order.findById(order._id)
       .populate('user', 'name email contact walletBalance')
       .populate('orderItems.product', 'name price unit images');
@@ -225,11 +215,12 @@ exports.checkout = async (req, res) => {
       success: true,
       message: 'Order placed successfully!',
       order: populatedOrder,
-      farmerPayments: farmerDistribution // Return farmer payment info
+      farmerPayments: farmerDistribution
     });
 
   } catch (error) {
     console.error('❌ CHECKOUT ERROR:', error);
+    console.error('❌ Error stack:', error.stack);
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to process checkout'
@@ -249,10 +240,10 @@ exports.soloCheckout = async (req, res) => {
       paymentMethod = 'Cash on Delivery', 
       address: providedAddress,
       shippingDistance = 5,
-      shippingCost = 150
+      shippingCost = 150,
+      isFarmer = false
     } = req.body;
 
-    // Validate required fields
     if (!productId) {
       return res.status(400).json({
         success: false,
@@ -260,7 +251,6 @@ exports.soloCheckout = async (req, res) => {
       });
     }
 
-    // Fetch user
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({
@@ -269,7 +259,6 @@ exports.soloCheckout = async (req, res) => {
       });
     }
 
-    // Check if user has address
     if (!user.address || !user.address.city || !user.address.barangay) {
       return res.status(400).json({
         success: false,
@@ -277,7 +266,6 @@ exports.soloCheckout = async (req, res) => {
       });
     }
 
-    // Fetch product
     const product = await Product.findOne({
       _id: productId,
       isDeleted: false,
@@ -291,7 +279,6 @@ exports.soloCheckout = async (req, res) => {
       });
     }
 
-    // Check stock
     if (product.quantity < quantity) {
       return res.status(400).json({
         success: false,
@@ -299,7 +286,6 @@ exports.soloCheckout = async (req, res) => {
       });
     }
 
-    // Create order item
     const orderItems = [{
       product: product._id,
       name: product.name,
@@ -311,17 +297,15 @@ exports.soloCheckout = async (req, res) => {
       farmerName: product.farmerName
     }];
 
-    // Calculate totals
     const shippingPrice = shippingCost || 50;
     const itemsPrice = product.price * quantity;
     const totalPrice = itemsPrice + shippingPrice;
 
-    // Handle wallet payment
     let paymentStatus = 'Pending';
     let paymentDetails = {};
+    let farmerDistribution = [];
 
     if (paymentMethod === 'Wallet') {
-      // Check if user has sufficient balance
       if (user.walletBalance < totalPrice) {
         return res.status(400).json({
           success: false,
@@ -329,25 +313,26 @@ exports.soloCheckout = async (req, res) => {
         });
       }
 
-      // Deduct from user's wallet
       const previousBalance = user.walletBalance;
       await user.deductWalletBalance(totalPrice);
       
-      // ========== PAY THE FARMER ==========
-      let farmerPayment = null;
       if (product.farmer) {
         const farmer = await User.findById(product.farmer);
         if (farmer) {
-          // Add the amount to farmer's wallet (itemsPrice only, shipping goes to platform)
           await farmer.addWalletBalance(itemsPrice);
           
-          farmerPayment = {
+          farmerDistribution = [{
             farmerId: farmer._id,
             farmerName: farmer.name || product.farmerName || 'Unknown Farmer',
             amount: itemsPrice,
-            productName: product.name,
-            quantity: quantity
-          };
+            items: [{
+              productId: product._id,
+              productName: product.name,
+              quantity: quantity,
+              price: product.price,
+              unit: product.unit
+            }]
+          }];
           
           console.log(`💰 Added ₱${itemsPrice.toFixed(2)} to farmer ${farmer.name}'s wallet`);
         }
@@ -361,11 +346,10 @@ exports.soloCheckout = async (req, res) => {
         previousBalance: previousBalance,
         newBalance: user.walletBalance,
         paymentDate: new Date(),
-        farmerPayment: farmerPayment // Track which farmer got paid
+        farmerDistribution: farmerDistribution
       };
     }
 
-    // Create shipping info
     let shippingInfo;
     if (providedAddress && providedAddress.city && providedAddress.barangay) {
       shippingInfo = {
@@ -393,7 +377,6 @@ exports.soloCheckout = async (req, res) => {
       };
     }
 
-    // Create order
     const order = await Order.create({
       user: userId,
       orderItems,
@@ -406,15 +389,15 @@ exports.soloCheckout = async (req, res) => {
       paymentDetails,
       orderStatus: 'Processing',
       paymentMethod: paymentMethod === 'Wallet' ? 'Wallet' : 'Cash on Delivery',
-      shippingDistance: shippingDistance || 0
+      shippingDistance: shippingDistance || 0,
+      farmerPayments: farmerDistribution,
+      isFarmerOrder: isFarmer
     });
 
-    // Decrease stock
     product.quantity = Math.max(product.quantity - quantity, 0);
     await product.save();
     console.log(`✅ Stock updated for "${product.name}": ${product.quantity} remaining`);
 
-    // Populate order with user and product details
     const populatedOrder = await Order.findById(order._id)
       .populate('user', 'name email contact walletBalance')
       .populate('orderItems.product', 'name price unit images');
@@ -422,7 +405,8 @@ exports.soloCheckout = async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Order placed successfully!',
-      order: populatedOrder
+      order: populatedOrder,
+      farmerPayments: farmerDistribution
     });
 
   } catch (error) {
@@ -499,7 +483,6 @@ exports.cancelOrder = async (req, res) => {
     const userId = req.user.id;
     const { orderId } = req.params;
 
-    // Find the order
     const order = await Order.findOne({ _id: orderId, user: userId });
 
     if (!order) {
@@ -509,7 +492,6 @@ exports.cancelOrder = async (req, res) => {
       });
     }
 
-    // ONLY ALLOW CANCELLATION IF STATUS IS "Processing"
     if (order.orderStatus !== 'Processing') {
       return res.status(400).json({
         success: false,
@@ -517,20 +499,16 @@ exports.cancelOrder = async (req, res) => {
       });
     }
 
-    // If payment was made via wallet, refund the user AND deduct from farmers
     if (order.paymentMethod === 'Wallet' && order.paymentStatus === 'Paid') {
       const user = await User.findById(userId);
       if (user) {
-        // Refund the user
         await user.addWalletBalance(order.totalPrice);
         console.log(`💰 Refunded ₱${order.totalPrice.toFixed(2)} to user's wallet`);
         
-        // Deduct from farmers
         if (order.paymentDetails && order.paymentDetails.farmerDistribution) {
           for (const farmerPayment of order.paymentDetails.farmerDistribution) {
             const farmer = await User.findById(farmerPayment.farmerId);
             if (farmer) {
-              // Deduct the amount from farmer's wallet
               farmer.walletBalance = Math.max(farmer.walletBalance - farmerPayment.amount, 0);
               await farmer.save();
               console.log(`💰 Deducted ₱${farmerPayment.amount.toFixed(2)} from farmer ${farmer.name}'s wallet (Order Cancelled)`);
@@ -540,7 +518,6 @@ exports.cancelOrder = async (req, res) => {
       }
     }
 
-    // Restore product quantities
     for (const item of order.orderItems) {
       const product = await Product.findById(item.product);
       if (product) {
@@ -550,14 +527,12 @@ exports.cancelOrder = async (req, res) => {
       }
     }
 
-    // Update order status
     order.orderStatus = 'Cancelled';
     order.paymentStatus = 'Cancelled';
     order.cancelledAt = new Date();
 
     await order.save();
 
-    // Populate order for response
     const cancelledOrder = await Order.findById(order._id)
       .populate('user', 'name email contact walletBalance')
       .populate('orderItems.product', 'name price unit images');

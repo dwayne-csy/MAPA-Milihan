@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'react-toastify';
-import FarmerHeader from '../layouts/Header';
+import FarmerHeader from '../layouts/FarmerHeader';
 import { 
   FiPlus, 
   FiMinus, 
@@ -16,7 +16,8 @@ import {
   FiCheck,
   FiChevronDown,
   FiUser,
-  FiPhone
+  FiPhone,
+  FiPackage
 } from 'react-icons/fi';
 import { 
   MdWallet
@@ -37,6 +38,7 @@ const FarmerWallet = () => {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('gcash');
   const [showPaymentDropdown, setShowPaymentDropdown] = useState(false);
   const [totalSpent, setTotalSpent] = useState(0);
+  const [totalEarned, setTotalEarned] = useState(0);
   
   // Payment account details
   const [accountNumber, setAccountNumber] = useState('');
@@ -107,16 +109,21 @@ const FarmerWallet = () => {
   // Calculate totals from transactions
   const calculateTotals = useCallback((transactionsList) => {
     let spent = 0;
+    let earned = 0;
     
     transactionsList.forEach(t => {
       if (t.type === 'debit' && t.status === 'completed') {
         spent += t.amount;
       }
+      if (t.type === 'credit' && t.status === 'completed') {
+        earned += t.amount;
+      }
     });
     
     setTotalSpent(spent);
+    setTotalEarned(earned);
     
-    return { totalSpent: spent };
+    return { totalSpent: spent, totalEarned: earned };
   }, []);
 
   // Fetch wallet balance
@@ -169,11 +176,13 @@ const FarmerWallet = () => {
       } else {
         setTransactions([]);
         setTotalSpent(0);
+        setTotalEarned(0);
       }
     } catch (error) {
       console.error('Error fetching transactions:', error);
       setTransactions([]);
       setTotalSpent(0);
+      setTotalEarned(0);
     } finally {
       setLoadingTransactions(false);
     }
@@ -401,7 +410,7 @@ const FarmerWallet = () => {
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
           <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-green-50 rounded-lg">
@@ -419,6 +428,19 @@ const FarmerWallet = () => {
             <div className="flex items-center gap-3">
               <div className="p-2 bg-purple-50 rounded-lg">
                 <FiRefreshCw className="text-purple-600 text-lg" />
+              </div>
+              <div>
+                <div className="text-xs text-gray-500 font-medium">Total Earned</div>
+                <div className="text-lg font-semibold text-gray-800">
+                  {formatCurrency(totalEarned)}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-red-50 rounded-lg">
+                <FiPackage className="text-red-600 text-lg" />
               </div>
               <div>
                 <div className="text-xs text-gray-500 font-medium">Total Spent</div>
@@ -453,7 +475,7 @@ const FarmerWallet = () => {
               <div className="text-center py-8 text-gray-400">
                 <FiClock className="text-3xl text-gray-300 mx-auto mb-2" />
                 <p className="text-sm font-medium">No transactions yet</p>
-                <p className="text-xs">Your transaction history will appear here after you top up</p>
+                <p className="text-xs">Your transaction history will appear here after you top up or receive payments</p>
               </div>
             ) : (
               <div className="space-y-3">

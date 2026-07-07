@@ -250,6 +250,9 @@ const ViewOrder = () => {
     );
   }
 
+  // Check if buyer is a farmer
+  const isBuyerFarmer = order.user?.role === 'farmer';
+
   return (
     <div className="full-bleed w-full min-h-screen bg-[#f5f7f5] flex flex-col">
       <FarmerHeader />
@@ -413,6 +416,16 @@ const ViewOrder = () => {
           color: #263238;
           font-weight: 500;
           word-break: break-word;
+        }
+
+        .vo-customer-item .role-badge {
+          font-size: 0.6rem;
+          background: #e8f5e9;
+          color: #2E7D32;
+          padding: 2px 10px;
+          border-radius: 12px;
+          font-weight: 600;
+          margin-left: 8px;
         }
 
         /* ── Order Items ── */
@@ -699,7 +712,12 @@ const ViewOrder = () => {
                     <span className="icon"><UserIcon size={18} /></span>
                     <div className="info">
                       <span className="label">Name</span>
-                      <span className="value">{order.user?.name || 'N/A'}</span>
+                      <span className="value">
+                        {order.user?.name || 'N/A'}
+                        {isBuyerFarmer && (
+                          <span className="role-badge">🌾 Farmer</span>
+                        )}
+                      </span>
                     </div>
                   </div>
                   <div className="vo-customer-item">

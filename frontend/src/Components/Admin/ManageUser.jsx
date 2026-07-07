@@ -1,5 +1,4 @@
 // Mapa-Milihan/frontend/src/Components/Admin/ManageUser.jsx
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import LeftNavigationBar from '../layouts/LeftNavigationBar';
@@ -27,7 +26,6 @@ import {
   MenuItem,
   Select,
   FormControl,
-  InputLabel,
   Avatar,
   Stack,
   Tooltip,
@@ -37,10 +35,13 @@ import {
   Card,
   CardContent,
   Grid,
-  Badge,
-  Divider,
   Checkbox,
-  InputAdornment
+  InputAdornment,
+  useTheme,
+  alpha,
+  Tabs,
+  Tab,
+  Badge
 } from '@mui/material';
 import {
   Refresh as RefreshIcon,
@@ -56,16 +57,23 @@ import {
   Restore as RestoreIcon,
   Search as SearchIcon,
   Close as CloseIcon,
-  Warning as WarningIcon
+  Warning as WarningIcon,
+  Dashboard as DashboardIcon,
+  People as PeopleIcon,
+  Verified as VerifiedIcon,
+  Shield as ShieldIcon,
+  Email as EmailIcon,
+  Phone as PhoneIcon,
+  LocationOn as LocationIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 import { format } from 'date-fns';
 
-// API URL - using Vite environment variable, fallback to port 4001
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4001';
 
 const ManageUser = () => {
   const navigate = useNavigate();
+  const theme = useTheme();
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState([]);
   const [statistics, setStatistics] = useState(null);
@@ -81,24 +89,21 @@ const ManageUser = () => {
   const [viewUserDialog, setViewUserDialog] = useState(false);
   const [selectedUserForView, setSelectedUserForView] = useState(null);
   const [actionType, setActionType] = useState('single');
+  const [tabValue, setTabValue] = useState(0);
 
-  // Check authentication and admin role
   useEffect(() => {
     if (!isAuthenticated()) {
       navigate('/login');
       return;
     }
-    
     const user = getUser();
     if (user?.role !== 'admin' && user?.userType !== 'Admin') {
       navigate('/home');
       return;
     }
-    
     setAdminInfo(user);
   }, [navigate]);
 
-  // Auth headers
   const getAuthHeaders = () => {
     const token = getToken();
     return {
@@ -109,7 +114,6 @@ const ManageUser = () => {
     };
   };
 
-  // Fetch users
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
@@ -117,7 +121,6 @@ const ManageUser = () => {
         page: pagination.page + 1,
         limit: pagination.limit
       });
-      
       if (filter.role !== 'all') params.append('role', filter.role);
       if (filter.status !== 'all') {
         if (filter.status === 'active') params.append('isActive', 'true');
@@ -144,8 +147,6 @@ const ManageUser = () => {
       if (error.response?.status === 401) {
         showSnackbar('Session expired. Please login again.', 'error');
         navigate('/login');
-      } else if (error.response?.status === 403) {
-        showSnackbar('You do not have admin permissions.', 'error');
       } else {
         showSnackbar(error.response?.data?.message || 'Error fetching users', 'error');
       }
@@ -154,14 +155,12 @@ const ManageUser = () => {
     }
   }, [pagination.page, pagination.limit, filter.role, filter.status, filter.search, navigate]);
 
-  // Fetch statistics
   const fetchStatistics = useCallback(async () => {
     try {
       const response = await axios.get(
         `${API_BASE_URL}/api/v1/admin/users/stats`,
         getAuthHeaders()
       );
-
       if (response.data.success) {
         setStatistics(response.data.stats);
       }
@@ -170,37 +169,31 @@ const ManageUser = () => {
     }
   }, []);
 
-  // Initial load
   useEffect(() => {
     fetchUsers();
     fetchStatistics();
   }, [fetchUsers, fetchStatistics]);
 
-  // Refresh data
   const handleRefresh = () => {
     fetchUsers();
     fetchStatistics();
   };
 
-  // Show snackbar
   const showSnackbar = (message, severity = 'success') => {
     setSnackbar({ open: true, message, severity });
   };
 
-  // Handle filter change
   const handleFilterChange = (event) => {
     const { name, value } = event.target;
     setFilter(prev => ({ ...prev, [name]: value }));
     setPagination(prev => ({ ...prev, page: 0 }));
   };
 
-  // Handle search
-  const handleSearch = (event) => {
+  const handleSearchChange = (event) => {
     setFilter(prev => ({ ...prev, search: event.target.value }));
     setPagination(prev => ({ ...prev, page: 0 }));
   };
 
-  // Handle page change
   const handlePageChange = (event, newPage) => {
     setPagination(prev => ({ ...prev, page: newPage }));
   };
@@ -209,21 +202,18 @@ const ManageUser = () => {
     setPagination(prev => ({ ...prev, limit: parseInt(event.target.value, 10), page: 0 }));
   };
 
-  // Handle select all
   const handleSelectAllClick = (event) => {
     if (event.target.checked) {
-      const newSelected = users.map((user) => user._id);
+      const newSelected = users.filter(u => !u.isDeleted).map((user) => user._id);
       setSelectedUsers(newSelected);
       return;
     }
     setSelectedUsers([]);
   };
 
-  // Handle select one
   const handleSelectClick = (event, userId) => {
     const selectedIndex = selectedUsers.indexOf(userId);
     let newSelected = [];
-
     if (selectedIndex === -1) {
       newSelected = newSelected.concat(selectedUsers, userId);
     } else if (selectedIndex === 0) {
@@ -236,11 +226,9 @@ const ManageUser = () => {
         selectedUsers.slice(selectedIndex + 1)
       );
     }
-
     setSelectedUsers(newSelected);
   };
 
-  // Open dialog
   const openDialog = (type, user = null, bulk = false) => {
     setSelectedUser(user);
     setDialogType(type);
@@ -249,32 +237,23 @@ const ManageUser = () => {
     setDialogOpen(true);
   };
 
-  // Close dialog
   const closeDialog = () => {
     setDialogOpen(false);
     setSelectedUser(null);
   };
 
-  // Open view user dialog
   const openViewUserDialog = (user) => {
     setSelectedUserForView(user);
     setViewUserDialog(true);
   };
 
-  // Close view user dialog
   const closeViewUserDialog = () => {
     setViewUserDialog(false);
     setSelectedUserForView(null);
   };
 
-  // Handle change role
   const handleChangeRole = async () => {
-    if (!selectedUser) {
-      showSnackbar('No user selected', 'error');
-      return;
-    }
-
-    if (!dialogData.role) {
+    if (!selectedUser || !dialogData.role) {
       showSnackbar('Please select a role', 'error');
       return;
     }
@@ -300,11 +279,9 @@ const ManageUser = () => {
     }
   };
 
-  // Handle deactivate users
   const handleDeactivate = async () => {
     const userIds = actionType === 'bulk' ? selectedUsers : [selectedUser?._id];
-    
-    if (userIds.length === 0) {
+    if (userIds.length === 0 || !userIds[0]) {
       showSnackbar('No users selected', 'error');
       return;
     }
@@ -316,15 +293,12 @@ const ManageUser = () => {
           { userIds },
           getAuthHeaders()
         );
-
         if (response.data.success) {
-          showSnackbar(`${response.data.modifiedCount || userIds.length} user(s) deactivated successfully`, 'success');
+          showSnackbar(`${response.data.modifiedCount || userIds.length} user(s) deactivated`, 'success');
           closeDialog();
           setSelectedUsers([]);
           fetchUsers();
           fetchStatistics();
-        } else {
-          showSnackbar(response.data.message || 'Error deactivating users', 'error');
         }
       } else {
         const response = await axios.put(
@@ -332,14 +306,11 @@ const ManageUser = () => {
           {},
           getAuthHeaders()
         );
-
         if (response.data.success) {
-          showSnackbar(`User ${selectedUser.name} deactivated successfully`, 'success');
+          showSnackbar(`${selectedUser.name} deactivated`, 'success');
           closeDialog();
           fetchUsers();
           fetchStatistics();
-        } else {
-          showSnackbar(response.data.message || 'Error deactivating user', 'error');
         }
       }
     } catch (error) {
@@ -348,12 +319,8 @@ const ManageUser = () => {
     }
   };
 
-  // Handle activate user
   const handleActivate = async () => {
-    if (!selectedUser) {
-      showSnackbar('No user selected', 'error');
-      return;
-    }
+    if (!selectedUser) return;
 
     try {
       const response = await axios.put(
@@ -361,14 +328,11 @@ const ManageUser = () => {
         {},
         getAuthHeaders()
       );
-
       if (response.data.success) {
-        showSnackbar(`User ${selectedUser.name} activated successfully`, 'success');
+        showSnackbar(`${selectedUser.name} activated`, 'success');
         closeDialog();
         fetchUsers();
         fetchStatistics();
-      } else {
-        showSnackbar(response.data.message || 'Error activating user', 'error');
       }
     } catch (error) {
       console.error('Error activating user:', error);
@@ -376,11 +340,9 @@ const ManageUser = () => {
     }
   };
 
-  // Handle soft delete (bulk or single)
   const handleSoftDelete = async () => {
     const userIds = actionType === 'bulk' ? selectedUsers : [selectedUser?._id];
-    
-    if (userIds.length === 0) {
+    if (userIds.length === 0 || !userIds[0]) {
       showSnackbar('No users selected', 'error');
       return;
     }
@@ -392,15 +354,12 @@ const ManageUser = () => {
           { userIds },
           getAuthHeaders()
         );
-
         if (response.data.success) {
-          showSnackbar(`${response.data.modifiedCount || userIds.length} user(s) deleted successfully`, 'success');
+          showSnackbar(`${response.data.modifiedCount || userIds.length} user(s) deleted`, 'success');
           closeDialog();
           setSelectedUsers([]);
           fetchUsers();
           fetchStatistics();
-        } else {
-          showSnackbar(response.data.message || 'Error deleting users', 'error');
         }
       } else {
         const response = await axios.put(
@@ -408,14 +367,11 @@ const ManageUser = () => {
           {},
           getAuthHeaders()
         );
-
         if (response.data.success) {
-          showSnackbar(`User ${selectedUser.name} deleted successfully`, 'success');
+          showSnackbar(`${selectedUser.name} deleted`, 'success');
           closeDialog();
           fetchUsers();
           fetchStatistics();
-        } else {
-          showSnackbar(response.data.message || 'Error deleting user', 'error');
         }
       }
     } catch (error) {
@@ -424,12 +380,8 @@ const ManageUser = () => {
     }
   };
 
-  // Handle restore user
   const handleRestore = async () => {
-    if (!selectedUser) {
-      showSnackbar('No user selected', 'error');
-      return;
-    }
+    if (!selectedUser) return;
 
     try {
       const response = await axios.put(
@@ -437,14 +389,11 @@ const ManageUser = () => {
         {},
         getAuthHeaders()
       );
-
       if (response.data.success) {
-        showSnackbar(`User ${selectedUser.name} restored successfully`, 'success');
+        showSnackbar(`${selectedUser.name} restored`, 'success');
         closeDialog();
         fetchUsers();
         fetchStatistics();
-      } else {
-        showSnackbar(response.data.message || 'Error restoring user', 'error');
       }
     } catch (error) {
       console.error('Error restoring user:', error);
@@ -452,26 +401,19 @@ const ManageUser = () => {
     }
   };
 
-  // Handle hard delete
   const handleHardDelete = async () => {
-    if (!selectedUser) {
-      showSnackbar('No user selected', 'error');
-      return;
-    }
+    if (!selectedUser) return;
 
     try {
       const response = await axios.delete(
         `${API_BASE_URL}/api/v1/admin/users/${selectedUser._id}/hard-delete`,
         getAuthHeaders()
       );
-
       if (response.data.success) {
-        showSnackbar(`User ${selectedUser.name} permanently deleted`, 'success');
+        showSnackbar(`${selectedUser.name} permanently deleted`, 'success');
         closeDialog();
         fetchUsers();
         fetchStatistics();
-      } else {
-        showSnackbar(response.data.message || 'Error permanently deleting user', 'error');
       }
     } catch (error) {
       console.error('Error permanently deleting user:', error);
@@ -479,7 +421,6 @@ const ManageUser = () => {
     }
   };
 
-  // Get role chip color
   const getRoleChipColor = (role) => {
     switch (role) {
       case 'admin': return 'warning';
@@ -489,7 +430,6 @@ const ManageUser = () => {
     }
   };
 
-  // Get role icon
   const getRoleIcon = (role) => {
     switch (role) {
       case 'admin': return <AdminIcon fontSize="small" />;
@@ -498,40 +438,30 @@ const ManageUser = () => {
     }
   };
 
-  // Get status chip color
-  const getStatusChipColor = (user) => {
-    if (user.isDeleted) return 'error';
-    if (user.isActive) return 'success';
-    return 'warning';
+  const getStatusBadgeColor = (user) => {
+    if (user.isDeleted) return '#D32F2F';
+    if (user.isActive) return '#2E7D32';
+    return '#ED6C02';
   };
 
-  // Get status label
   const getStatusLabel = (user) => {
     if (user.isDeleted) return 'Deleted';
     if (user.isActive) return 'Active';
     return 'Inactive';
   };
 
-  // Format date
   const formatDate = (date) => {
     if (!date) return 'N/A';
     try {
-      return format(new Date(date), 'MMM dd, yyyy HH:mm');
+      return format(new Date(date), 'MMM dd, yyyy');
     } catch {
       return 'Invalid date';
     }
   };
 
-  // Render avatar
-  const renderAvatar = (user, fallbackIcon = <PersonIcon />) => {
+  const renderAvatar = (user) => {
     if (user?.avatar?.url) {
-      return (
-        <Avatar 
-          src={user.avatar.url} 
-          alt={user.name || 'User'}
-          sx={{ width: 40, height: 40 }}
-        />
-      );
+      return <Avatar src={user.avatar.url} alt={user.name} sx={{ width: 40, height: 40 }} />;
     }
     return (
       <Avatar sx={{ width: 40, height: 40, bgcolor: '#2E7D32' }}>
@@ -540,211 +470,18 @@ const ManageUser = () => {
     );
   };
 
-  // Render statistics cards
-  const renderStatistics = () => {
-    if (!statistics) return null;
-
-    const stats = [
-      { label: 'Total Users', value: statistics.total || 0, color: '#1565C0', icon: <PersonIcon /> },
-      { label: 'Active', value: statistics.active || 0, color: '#2E7D32', icon: <CheckCircleIcon /> },
-      { label: 'Inactive', value: statistics.inactive || 0, color: '#D32F2F', icon: <BlockIcon /> },
-      { label: 'Verified', value: statistics.verified || 0, color: '#0288D1', icon: <CheckCircleIcon /> },
-      { label: 'Deleted', value: statistics.deleted || 0, color: '#757575', icon: <DeleteIcon /> },
-    ];
-
-    return (
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        {stats.map((stat) => (
-          <Grid item xs={12} sm={6} md={2.4} key={stat.label}>
-            <Card>
-              <CardContent sx={{ textAlign: 'center' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
-                  <Box sx={{ color: stat.color }}>
-                    {stat.icon}
-                  </Box>
-                </Box>
-                <Typography variant="h4" component="div" sx={{ fontWeight: 'bold' }}>
-                  {stat.value}
-                </Typography>
-                <Typography variant="body2" color="textSecondary">
-                  {stat.label}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
-    );
-  };
-
-  // Render user item
-  const renderUserItem = (user) => {
-    const isDeleted = user.isDeleted || false;
-    const isActive = user.isActive || false;
-    const isVerified = user.isVerified || false;
-    const role = user.role || 'user';
-    const authProvider = user.authProvider || 'local';
-
-    return (
-      <TableRow key={user._id} hover>
-        <TableCell padding="checkbox">
-          <Checkbox
-            checked={selectedUsers.includes(user._id)}
-            onChange={(event) => handleSelectClick(event, user._id)}
-            disabled={isDeleted}
-          />
-        </TableCell>
-        <TableCell>
-          <Stack direction="row" spacing={1.5} alignItems="center">
-            {renderAvatar(user)}
-            <Box>
-              <Typography variant="body2" fontWeight="medium">
-                {user.name}
-              </Typography>
-              <Typography variant="caption" color="textSecondary">
-                {user.email}
-              </Typography>
-            </Box>
-          </Stack>
-        </TableCell>
-        <TableCell>
-          <Chip
-            label={role}
-            size="small"
-            color={getRoleChipColor(role)}
-            icon={getRoleIcon(role)}
-          />
-        </TableCell>
-        <TableCell>
-          <Chip
-            label={getStatusLabel(user)}
-            size="small"
-            color={getStatusChipColor(user)}
-          />
-        </TableCell>
-        <TableCell>
-          {isVerified ? (
-            <Chip
-              label="Verified"
-              size="small"
-              color="success"
-              icon={<CheckCircleIcon fontSize="small" />}
-            />
-          ) : (
-            <Chip
-              label="Unverified"
-              size="small"
-              color="warning"
-            />
-          )}
-        </TableCell>
-        <TableCell>
-          <Chip
-            label={authProvider}
-            size="small"
-            variant="outlined"
-          />
-        </TableCell>
-        <TableCell>
-          <Typography variant="caption">
-            {formatDate(user.createdAt)}
-          </Typography>
-        </TableCell>
-        <TableCell>
-          <Stack direction="row" spacing={0.5}>
-            <Tooltip title="View Details">
-              <IconButton
-                size="small"
-                color="info"
-                onClick={() => openViewUserDialog(user)}
-              >
-                <VisibilityIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-            
-            {!isDeleted ? (
-              <>
-                <Tooltip title="Change Role">
-                  <IconButton
-                    size="small"
-                    color="primary"
-                    onClick={() => openDialog('role', user)}
-                  >
-                    <EditIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-                {isActive ? (
-                  <Tooltip title="Deactivate User">
-                    <IconButton
-                      size="small"
-                      color="warning"
-                      onClick={() => openDialog('deactivate', user)}
-                    >
-                      <BlockIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                ) : (
-                  <Tooltip title="Activate User">
-                    <IconButton
-                      size="small"
-                      color="success"
-                      onClick={() => openDialog('activate', user)}
-                    >
-                      <CheckCircleIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                )}
-                <Tooltip title="Delete User">
-                  <IconButton
-                    size="small"
-                    color="error"
-                    onClick={() => openDialog('delete', user)}
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              </>
-            ) : (
-              <>
-                <Tooltip title="Restore User">
-                  <IconButton
-                    size="small"
-                    color="success"
-                    onClick={() => openDialog('restore', user)}
-                  >
-                    <RestoreIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-                <Tooltip title="Permanently Delete">
-                  <IconButton
-                    size="small"
-                    color="error"
-                    onClick={() => openDialog('hardDelete', user)}
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              </>
-            )}
-          </Stack>
-        </TableCell>
-      </TableRow>
-    );
-  };
-
-  // Check if user is admin, if not show access denied
   if (!adminInfo) {
     return (
-      <div className="min-h-screen bg-gray-100">
+      <div className="min-h-screen bg-gray-50">
         <LeftNavigationBar />
-        <div className="ml-64 p-8 flex items-center justify-center">
-          <Paper sx={{ p: 4, textAlign: 'center', maxWidth: 500 }}>
-            <WarningIcon color="error" sx={{ fontSize: 60, mb: 2 }} />
-            <Typography variant="h5" color="error" gutterBottom>
+        <div className="ml-64 p-8 flex items-center justify-center min-h-[80vh]">
+          <Paper sx={{ p: 6, textAlign: 'center', maxWidth: 500, borderRadius: 3 }}>
+            <ShieldIcon color="error" sx={{ fontSize: 72, mb: 2 }} />
+            <Typography variant="h5" color="error" gutterBottom fontWeight="bold">
               Access Denied
             </Typography>
             <Typography variant="body1" color="textSecondary">
-              You do not have permission to access this page. This area is restricted to administrators only.
+              You do not have permission to access this page.
             </Typography>
           </Paper>
         </div>
@@ -753,154 +490,384 @@ const ManageUser = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-50">
       <LeftNavigationBar />
       
-      <div className="ml-64 p-8">
-        <Container maxWidth="xl" sx={{ py: 3 }}>
-          <Paper sx={{ p: 3 }}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-              <Typography variant="h5" component="h1" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <PersonIcon color="primary" />
-                User Management
-              </Typography>
-              <Button
-                variant="outlined"
-                startIcon={<RefreshIcon />}
-                onClick={handleRefresh}
-                disabled={loading}
-              >
-                Refresh
-              </Button>
+      <div className="ml-64 p-6">
+        <Container maxWidth="xl" sx={{ py: 2 }}>
+          {/* Header */}
+          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Paper sx={{ p: 1.5, borderRadius: 2, bgcolor: alpha(theme.palette.primary.main, 0.1) }}>
+                <PeopleIcon sx={{ color: theme.palette.primary.main }} />
+              </Paper>
+              <Box>
+                <Typography variant="h5" fontWeight="bold">
+                  User Management
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  Manage all registered users and their permissions
+                </Typography>
+              </Box>
             </Stack>
+            <Button
+              variant="outlined"
+              startIcon={<RefreshIcon />}
+              onClick={handleRefresh}
+              disabled={loading}
+              sx={{ borderRadius: 2 }}
+            >
+              Refresh
+            </Button>
+          </Stack>
 
-            {/* Statistics */}
-            {renderStatistics()}
+          {/* Statistics Cards */}
+          {statistics && (
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+              {[
+                { label: 'Total Users', value: statistics.total || 0, color: '#1565C0', icon: <DashboardIcon /> },
+                { label: 'Active', value: statistics.active || 0, color: '#2E7D32', icon: <CheckCircleIcon /> },
+                { label: 'Inactive', value: statistics.inactive || 0, color: '#ED6C02', icon: <BlockIcon /> },
+                { label: 'Verified', value: statistics.verified || 0, color: '#0288D1', icon: <VerifiedIcon /> },
+                { label: 'Deleted', value: statistics.deleted || 0, color: '#757575', icon: <DeleteIcon /> },
+              ].map((stat) => (
+                <Grid item xs={12} sm={6} md={2.4} key={stat.label}>
+                  <Card sx={{ borderRadius: 3, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                    <CardContent>
+                      <Stack direction="row" justifyContent="space-between" alignItems="center">
+                        <Box>
+                          <Typography variant="h4" fontWeight="bold">
+                            {stat.value}
+                          </Typography>
+                          <Typography variant="body2" color="textSecondary">
+                            {stat.label}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ color: stat.color, bgcolor: alpha(stat.color, 0.1), p: 1, borderRadius: 2 }}>
+                          {stat.icon}
+                        </Box>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          )}
 
+          {/* Main Content */}
+          <Paper sx={{ borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
             {/* Filters */}
-            <Stack direction="row" spacing={2} sx={{ mb: 2 }} flexWrap="wrap">
-              <TextField
-                size="small"
-                placeholder="Search by name or email..."
-                value={filter.search}
-                onChange={handleSearch}
-                sx={{ minWidth: 250 }}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-
-              <FormControl size="small" sx={{ minWidth: 150 }}>
-                <InputLabel>Role</InputLabel>
-                <Select
-                  name="role"
-                  value={filter.role}
-                  onChange={handleFilterChange}
-                  label="Role"
+            <Box sx={{ p: 2, bgcolor: alpha(theme.palette.primary.main, 0.02), borderBottom: 1, borderColor: 'divider' }}>
+              <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
+                <TextField
+                  size="small"
+                  placeholder="Search by name or email..."
+                  value={filter.search}
+                  onChange={handleSearchChange}
+                  sx={{ minWidth: 250, flex: 1 }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon fontSize="small" />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+                <FormControl size="small" sx={{ minWidth: 140 }}>
+                  <Select
+                    name="role"
+                    value={filter.role}
+                    onChange={handleFilterChange}
+                    displayEmpty
+                  >
+                    <MenuItem value="all">All Roles</MenuItem>
+                    <MenuItem value="user">User</MenuItem>
+                    <MenuItem value="farmer">Farmer</MenuItem>
+                    <MenuItem value="admin">Admin</MenuItem>
+                  </Select>
+                </FormControl>
+                <FormControl size="small" sx={{ minWidth: 140 }}>
+                  <Select
+                    name="status"
+                    value={filter.status}
+                    onChange={handleFilterChange}
+                    displayEmpty
+                  >
+                    <MenuItem value="all">All Status</MenuItem>
+                    <MenuItem value="active">Active</MenuItem>
+                    <MenuItem value="inactive">Inactive</MenuItem>
+                    <MenuItem value="deleted">Deleted</MenuItem>
+                  </Select>
+                </FormControl>
+                {selectedUsers.length > 0 && (
+                  <Stack direction="row" spacing={1}>
+                    <Button
+                      variant="contained"
+                      color="warning"
+                      size="small"
+                      onClick={() => openDialog('deactivate', null, true)}
+                      sx={{ borderRadius: 2 }}
+                    >
+                      Deactivate ({selectedUsers.length})
+                    </Button>
+                    <Button
+                      variant="contained"
+                      color="error"
+                      size="small"
+                      onClick={() => openDialog('delete', null, true)}
+                      sx={{ borderRadius: 2 }}
+                    >
+                      Delete ({selectedUsers.length})
+                    </Button>
+                    <Button
+                      variant="text"
+                      size="small"
+                      onClick={() => setSelectedUsers([])}
+                      sx={{ color: 'text.secondary' }}
+                    >
+                      Clear
+                    </Button>
+                  </Stack>
+                )}
+                <Button
+                  variant="text"
+                  size="small"
+                  onClick={() => {
+                    setFilter({ role: 'all', status: 'all', search: '' });
+                    setPagination(prev => ({ ...prev, page: 0 }));
+                    setSelectedUsers([]);
+                  }}
+                  sx={{ color: 'text.secondary' }}
                 >
-                  <MenuItem value="all">All Roles</MenuItem>
-                  <MenuItem value="user">User</MenuItem>
-                  <MenuItem value="farmer">Farmer</MenuItem>
-                  <MenuItem value="admin">Admin</MenuItem>
-                </Select>
-              </FormControl>
-
-              <FormControl size="small" sx={{ minWidth: 150 }}>
-                <InputLabel>Status</InputLabel>
-                <Select
-                  name="status"
-                  value={filter.status}
-                  onChange={handleFilterChange}
-                  label="Status"
-                >
-                  <MenuItem value="all">All</MenuItem>
-                  <MenuItem value="active">Active</MenuItem>
-                  <MenuItem value="inactive">Inactive</MenuItem>
-                  <MenuItem value="deleted">Deleted</MenuItem>
-                </Select>
-              </FormControl>
-
-              {selectedUsers.length > 0 && (
-                <Stack direction="row" spacing={1}>
-                  <Button
-                    variant="contained"
-                    color="warning"
-                    size="small"
-                    onClick={() => openDialog('deactivate', null, true)}
-                  >
-                    Deactivate ({selectedUsers.length})
-                  </Button>
-                  <Button
-                    variant="contained"
-                    color="error"
-                    size="small"
-                    onClick={() => openDialog('delete', null, true)}
-                  >
-                    Delete ({selectedUsers.length})
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    onClick={() => setSelectedUsers([])}
-                  >
-                    Clear
-                  </Button>
-                </Stack>
-              )}
-
-              <Button
-                variant="contained"
-                size="small"
-                onClick={() => {
-                  setFilter({ role: 'all', status: 'all', search: '' });
-                  setPagination(prev => ({ ...prev, page: 0 }));
-                  setSelectedUsers([]);
-                }}
-              >
-                Clear Filters
-              </Button>
-            </Stack>
+                  Clear Filters
+                </Button>
+              </Stack>
+            </Box>
 
             {/* Table */}
             <TableContainer>
               <Table>
                 <TableHead>
-                  <TableRow>
+                  <TableRow sx={{ bgcolor: alpha(theme.palette.primary.main, 0.04) }}>
                     <TableCell padding="checkbox">
                       <Checkbox
-                        indeterminate={selectedUsers.length > 0 && selectedUsers.length < users.length}
-                        checked={users.length > 0 && selectedUsers.length === users.length}
+                        indeterminate={selectedUsers.length > 0 && selectedUsers.length < users.filter(u => !u.isDeleted).length}
+                        checked={users.filter(u => !u.isDeleted).length > 0 && selectedUsers.length === users.filter(u => !u.isDeleted).length}
                         onChange={handleSelectAllClick}
                       />
                     </TableCell>
-                    <TableCell>User</TableCell>
-                    <TableCell>Role</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Verification</TableCell>
-                    <TableCell>Provider</TableCell>
-                    <TableCell>Joined</TableCell>
-                    <TableCell>Actions</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>User</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Role</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Verification</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Joined</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }} align="center">Actions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={8} align="center">
-                        <CircularProgress />
+                      <TableCell colSpan={7} align="center" sx={{ py: 8 }}>
+                        <CircularProgress size={40} />
                       </TableCell>
                     </TableRow>
                   ) : users.length > 0 ? (
-                    users.map(renderUserItem)
+                    users.map((user) => {
+                      const isDeleted = user.isDeleted || false;
+                      const isActive = user.isActive || false;
+                      const isVerified = user.isVerified || false;
+                      const role = user.role || 'user';
+
+                      return (
+                        <TableRow key={user._id} hover>
+                          <TableCell padding="checkbox">
+                            <Checkbox
+                              checked={selectedUsers.includes(user._id)}
+                              onChange={(event) => handleSelectClick(event, user._id)}
+                              disabled={isDeleted}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Stack direction="row" spacing={1.5} alignItems="center">
+                              {renderAvatar(user)}
+                              <Box>
+                                <Typography variant="body2" fontWeight="medium">
+                                  {user.name}
+                                </Typography>
+                                <Typography variant="caption" color="textSecondary">
+                                  {user.email}
+                                </Typography>
+                              </Box>
+                            </Stack>
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={role}
+                              size="small"
+                              icon={getRoleIcon(role)}
+                              sx={{ 
+                                borderRadius: 1,
+                                bgcolor: alpha(getRoleChipColor(role) === 'warning' ? '#ED6C02' : 
+                                              getRoleChipColor(role) === 'success' ? '#2E7D32' : '#0288D1', 0.1),
+                                color: getRoleChipColor(role) === 'warning' ? '#ED6C02' : 
+                                      getRoleChipColor(role) === 'success' ? '#2E7D32' : '#0288D1',
+                                fontWeight: 500
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={getStatusLabel(user)}
+                              size="small"
+                              sx={{ 
+                                borderRadius: 1,
+                                bgcolor: alpha(getStatusBadgeColor(user), 0.1),
+                                color: getStatusBadgeColor(user),
+                                fontWeight: 500
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            {isVerified ? (
+                              <Chip
+                                label="Verified"
+                                size="small"
+                                icon={<VerifiedIcon fontSize="small" />}
+                                sx={{ 
+                                  borderRadius: 1,
+                                  bgcolor: alpha('#2E7D32', 0.1),
+                                  color: '#2E7D32',
+                                  fontWeight: 500
+                                }}
+                              />
+                            ) : (
+                              <Chip
+                                label="Unverified"
+                                size="small"
+                                sx={{ 
+                                  borderRadius: 1,
+                                  bgcolor: alpha('#ED6C02', 0.1),
+                                  color: '#ED6C02',
+                                  fontWeight: 500
+                                }}
+                              />
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="caption" color="textSecondary">
+                              {formatDate(user.createdAt)}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Stack direction="row" spacing={0.5} justifyContent="center">
+                              <Tooltip title="View Details">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => openViewUserDialog(user)}
+                                  sx={{ 
+                                    bgcolor: alpha(theme.palette.info.main, 0.1),
+                                    '&:hover': { bgcolor: alpha(theme.palette.info.main, 0.2) }
+                                  }}
+                                >
+                                  <VisibilityIcon fontSize="small" sx={{ color: theme.palette.info.main }} />
+                                </IconButton>
+                              </Tooltip>
+                              {!isDeleted ? (
+                                <>
+                                  <Tooltip title="Change Role">
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => openDialog('role', user)}
+                                      sx={{ 
+                                        bgcolor: alpha(theme.palette.primary.main, 0.1),
+                                        '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.2) }
+                                      }}
+                                    >
+                                      <EditIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />
+                                    </IconButton>
+                                  </Tooltip>
+                                  {isActive ? (
+                                    <Tooltip title="Deactivate">
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => openDialog('deactivate', user)}
+                                        sx={{ 
+                                          bgcolor: alpha('#ED6C02', 0.1),
+                                          '&:hover': { bgcolor: alpha('#ED6C02', 0.2) }
+                                        }}
+                                      >
+                                        <BlockIcon fontSize="small" sx={{ color: '#ED6C02' }} />
+                                      </IconButton>
+                                    </Tooltip>
+                                  ) : (
+                                    <Tooltip title="Activate">
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => openDialog('activate', user)}
+                                        sx={{ 
+                                          bgcolor: alpha('#2E7D32', 0.1),
+                                          '&:hover': { bgcolor: alpha('#2E7D32', 0.2) }
+                                        }}
+                                      >
+                                        <CheckCircleIcon fontSize="small" sx={{ color: '#2E7D32' }} />
+                                      </IconButton>
+                                    </Tooltip>
+                                  )}
+                                  <Tooltip title="Delete">
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => openDialog('delete', user)}
+                                      sx={{ 
+                                        bgcolor: alpha(theme.palette.error.main, 0.1),
+                                        '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.2) }
+                                      }}
+                                    >
+                                      <DeleteIcon fontSize="small" sx={{ color: theme.palette.error.main }} />
+                                    </IconButton>
+                                  </Tooltip>
+                                </>
+                              ) : (
+                                <>
+                                  <Tooltip title="Restore">
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => openDialog('restore', user)}
+                                      sx={{ 
+                                        bgcolor: alpha('#2E7D32', 0.1),
+                                        '&:hover': { bgcolor: alpha('#2E7D32', 0.2) }
+                                      }}
+                                    >
+                                      <RestoreIcon fontSize="small" sx={{ color: '#2E7D32' }} />
+                                    </IconButton>
+                                  </Tooltip>
+                                  <Tooltip title="Permanent Delete">
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => openDialog('hardDelete', user)}
+                                      sx={{ 
+                                        bgcolor: alpha(theme.palette.error.main, 0.1),
+                                        '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.2) }
+                                      }}
+                                    >
+                                      <DeleteIcon fontSize="small" sx={{ color: theme.palette.error.main }} />
+                                    </IconButton>
+                                  </Tooltip>
+                                </>
+                              )}
+                            </Stack>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={8} align="center">
-                        <Typography variant="body2" color="textSecondary">
-                          No users found
-                        </Typography>
+                      <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
+                        <Stack alignItems="center" spacing={1}>
+                          <PeopleIcon sx={{ fontSize: 48, color: 'text.disabled' }} />
+                          <Typography variant="body1" color="textSecondary">
+                            No users found
+                          </Typography>
+                        </Stack>
                       </TableCell>
                     </TableRow>
                   )}
@@ -916,6 +883,7 @@ const ManageUser = () => {
               rowsPerPage={pagination.limit}
               onRowsPerPageChange={handleRowsPerPageChange}
               rowsPerPageOptions={[10, 20, 50, 100]}
+              sx={{ borderTop: 1, borderColor: 'divider' }}
             />
           </Paper>
         </Container>
@@ -934,8 +902,7 @@ const ManageUser = () => {
         <DialogContent dividers>
           {selectedUserForView && (
             <Stack spacing={2}>
-              {/* User Info */}
-              <Paper variant="outlined" sx={{ p: 2 }}>
+              <Paper sx={{ p: 2, borderRadius: 2, bgcolor: alpha(theme.palette.primary.main, 0.02) }}>
                 <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
                   {renderAvatar(selectedUserForView)}
                   <Box>
@@ -945,28 +912,23 @@ const ManageUser = () => {
                     </Typography>
                   </Box>
                 </Stack>
-                
                 <Grid container spacing={1}>
                   <Grid item xs={6}>
                     <Typography variant="caption" color="textSecondary">Role</Typography>
-                    <Typography variant="body2">
-                      <Chip
-                        label={selectedUserForView.role}
-                        size="small"
-                        color={getRoleChipColor(selectedUserForView.role)}
-                        icon={getRoleIcon(selectedUserForView.role)}
-                      />
-                    </Typography>
+                    <Chip
+                      label={selectedUserForView.role}
+                      size="small"
+                      icon={getRoleIcon(selectedUserForView.role)}
+                      sx={{ mt: 0.5 }}
+                    />
                   </Grid>
                   <Grid item xs={6}>
                     <Typography variant="caption" color="textSecondary">Status</Typography>
-                    <Typography variant="body2">
-                      <Chip
-                        label={getStatusLabel(selectedUserForView)}
-                        size="small"
-                        color={getStatusChipColor(selectedUserForView)}
-                      />
-                    </Typography>
+                    <Chip
+                      label={getStatusLabel(selectedUserForView)}
+                      size="small"
+                      sx={{ mt: 0.5 }}
+                    />
                   </Grid>
                   <Grid item xs={6}>
                     <Typography variant="caption" color="textSecondary">Verification</Typography>
@@ -975,26 +937,12 @@ const ManageUser = () => {
                     </Typography>
                   </Grid>
                   <Grid item xs={6}>
-                    <Typography variant="caption" color="textSecondary">Auth Provider</Typography>
-                    <Typography variant="body2">
-                      {selectedUserForView.authProvider || 'Local'}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={6}>
                     <Typography variant="caption" color="textSecondary">Joined</Typography>
                     <Typography variant="body2">{formatDate(selectedUserForView.createdAt)}</Typography>
                   </Grid>
-                  <Grid item xs={6}>
-                    <Typography variant="caption" color="textSecondary">User ID</Typography>
-                    <Typography variant="body2" sx={{ wordBreak: 'break-all', fontSize: '0.75rem' }}>
-                      {selectedUserForView._id}
-                    </Typography>
-                  </Grid>
                 </Grid>
               </Paper>
-
-              {/* Contact Info */}
-              <Paper variant="outlined" sx={{ p: 2 }}>
+              <Paper sx={{ p: 2, borderRadius: 2 }}>
                 <Typography variant="subtitle2" color="textSecondary" gutterBottom>Contact Information</Typography>
                 <Grid container spacing={1}>
                   <Grid item xs={12}>
@@ -1007,7 +955,7 @@ const ManageUser = () => {
                     <Typography variant="caption" color="textSecondary">Address</Typography>
                     <Typography variant="body2">
                       {selectedUserForView.address ? 
-                        `${selectedUserForView.address.street || ''} ${selectedUserForView.address.barangay || ''} ${selectedUserForView.address.city || ''} ${selectedUserForView.address.zipcode || ''}`.trim() || 'Not provided'
+                        `${selectedUserForView.address.street || ''} ${selectedUserForView.address.barangay || ''} ${selectedUserForView.address.city || ''}`.trim() || 'Not provided'
                         : 'Not provided'}
                     </Typography>
                   </Grid>
@@ -1017,13 +965,13 @@ const ManageUser = () => {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={closeViewUserDialog} variant="contained">
+          <Button onClick={closeViewUserDialog} variant="contained" sx={{ borderRadius: 2 }}>
             Close
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Dialogs */}
+      {/* Action Dialogs */}
       <Dialog open={dialogOpen} onClose={closeDialog} maxWidth="sm" fullWidth>
         <DialogTitle>
           {dialogType === 'role' && 'Change User Role'}
@@ -1039,15 +987,14 @@ const ManageUser = () => {
               <Typography variant="body2" color="textSecondary">
                 User: <strong>{selectedUser?.name}</strong>
               </Typography>
-              <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
+              <Typography variant="body2" color="textSecondary">
                 Current Role: <strong>{selectedUser?.role}</strong>
               </Typography>
               <FormControl fullWidth>
-                <InputLabel>New Role</InputLabel>
                 <Select
                   value={dialogData.role}
                   onChange={(e) => setDialogData(prev => ({ ...prev, role: e.target.value }))}
-                  label="New Role"
+                  displayEmpty
                 >
                   <MenuItem value="user">User</MenuItem>
                   <MenuItem value="farmer">Farmer</MenuItem>
@@ -1056,41 +1003,23 @@ const ManageUser = () => {
               </FormControl>
             </Stack>
           )}
-
           {dialogType === 'deactivate' && (
             <Typography variant="body2" color="warning" sx={{ mt: 1 }}>
               {actionType === 'bulk' 
-                ? `Are you sure you want to deactivate ${selectedUsers.length} user(s)? They will not be able to log in.`
-                : `Are you sure you want to deactivate ${selectedUser?.name}? They will not be able to log in.`
-              }
+                ? `Are you sure you want to deactivate ${selectedUsers.length} user(s)?`
+                : `Are you sure you want to deactivate ${selectedUser?.name}?`}
             </Typography>
           )}
-
-          {dialogType === 'activate' && (
-            <Typography variant="body2" color="success" sx={{ mt: 1 }}>
-              Are you sure you want to activate {selectedUser?.name}? They will be able to log in again.
-            </Typography>
-          )}
-
           {dialogType === 'delete' && (
             <Typography variant="body2" color="error" sx={{ mt: 1 }}>
               {actionType === 'bulk'
-                ? `Are you sure you want to delete ${selectedUsers.length} user(s)? They will be moved to trash and can be restored.`
-                : `Are you sure you want to delete ${selectedUser?.name}? They will be moved to trash and can be restored.`
-              }
+                ? `Are you sure you want to delete ${selectedUsers.length} user(s)? They can be restored.`
+                : `Are you sure you want to delete ${selectedUser?.name}? They can be restored.`}
             </Typography>
           )}
-
-          {dialogType === 'restore' && (
-            <Typography variant="body2" color="success" sx={{ mt: 1 }}>
-              Are you sure you want to restore {selectedUser?.name}? They will be able to log in again.
-            </Typography>
-          )}
-
           {dialogType === 'hardDelete' && (
             <Typography variant="body2" color="error" sx={{ mt: 1 }}>
-              <strong>WARNING:</strong> Are you sure you want to permanently delete {selectedUser?.name}? 
-              This action <strong>CANNOT</strong> be undone and all user data will be lost.
+              <strong>WARNING:</strong> Are you sure you want to permanently delete {selectedUser?.name}? This cannot be undone.
             </Typography>
           )}
         </DialogContent>
@@ -1107,12 +1036,11 @@ const ManageUser = () => {
               closeDialog
             }
             variant="contained"
-            color={
-              dialogType === 'hardDelete' || dialogType === 'delete' ? 'error' :
-              dialogType === 'deactivate' ? 'warning' :
-              dialogType === 'activate' || dialogType === 'restore' ? 'success' :
-              'primary'
-            }
+            color={dialogType === 'hardDelete' || dialogType === 'delete' ? 'error' :
+                   dialogType === 'deactivate' ? 'warning' :
+                   dialogType === 'activate' || dialogType === 'restore' ? 'success' :
+                   'primary'}
+            sx={{ borderRadius: 2 }}
           >
             {dialogType === 'role' ? 'Update Role' :
              dialogType === 'deactivate' ? 'Deactivate' :
@@ -1125,7 +1053,6 @@ const ManageUser = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}
@@ -1136,6 +1063,7 @@ const ManageUser = () => {
           onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
           severity={snackbar.severity}
           variant="filled"
+          sx={{ borderRadius: 2 }}
         >
           {snackbar.message}
         </Alert>

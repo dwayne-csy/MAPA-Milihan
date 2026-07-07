@@ -73,7 +73,15 @@ const OrderList = () => {
 
   useEffect(() => {
     fetchOrders();
-  }, [statusFilter, searchTerm]);
+  }, [statusFilter]);
+
+  // Debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchOrders();
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   const fetchOrders = async () => {
     try {
@@ -557,6 +565,15 @@ const OrderList = () => {
           color: #263238;
         }
 
+        .ol-customer-role {
+          font-size: 0.7rem;
+          color: #78909c;
+          background: #e8f5e9;
+          padding: 2px 8px;
+          border-radius: 12px;
+          margin-left: 6px;
+        }
+
         .ol-actions {
           display: flex;
           align-items: center;
@@ -649,7 +666,7 @@ const OrderList = () => {
               <p>
                 {searchTerm || statusFilter !== 'All'
                   ? 'Try adjusting your filters or search terms.'
-                  : 'Orders from customers will appear here once they place an order.'}
+                  : 'Orders from customers will appear here once they place an order for your products.'}
               </p>
             </div>
           ) : (
@@ -657,6 +674,8 @@ const OrderList = () => {
               {orders.map((order) => {
                 const availableStatuses = getAvailableStatuses(order.orderStatus);
                 const isUpdating = updatingOrderId === order._id;
+                // Check if the buyer is also a farmer
+                const isBuyerFarmer = order.user?.role === 'farmer';
 
                 return (
                   <div key={order._id} className="ol-order-card">
@@ -675,6 +694,9 @@ const OrderList = () => {
                           onClick={() => handleViewOrder(order._id)}
                         >
                           <strong>{order.user?.name || 'Unknown Customer'}</strong>
+                          {isBuyerFarmer && (
+                            <span className="ol-customer-role">🌾 Farmer</span>
+                          )}
                           {' • '}{order.user?.email || 'No email'}
                         </div>
                       </div>
