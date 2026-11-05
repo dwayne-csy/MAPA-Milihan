@@ -23,4 +23,4 @@ router.get('/farmer/products', isAuthenticatedUser, isFarmer, getFarmerProducts)
 router.put('/:id', isAuthenticatedUser, isFarmer, upload.array('images', 5), updateProduct);
 router.delete('/:id', isAuthenticatedUser, isFarmer, deleteProduct);
 
-module.exports = router;
+module.exports = router; 

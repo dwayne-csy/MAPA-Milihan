@@ -482,5 +482,5 @@ exports.getOrderStats = async (req, res) => {
       message: 'Failed to fetch order statistics.',
       error: error.message
     });
-  }
+  } 
 };

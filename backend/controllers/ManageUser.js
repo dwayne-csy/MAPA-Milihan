@@ -585,6 +585,6 @@ exports.bulkSoftDeleteUsers = async (req, res) => {
       success: false,
       message: 'Failed to delete users',
       error: error.message
-    });
+    }); 
   }
 };

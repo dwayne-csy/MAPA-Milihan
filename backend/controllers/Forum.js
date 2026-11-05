@@ -753,7 +753,7 @@ exports.toggleLikePost = async (req, res) => {
   }
 };
 
-// ========== TOGGLE LIKE ON COMMENT ==========
+// ========== TOGGLE LIKE ON COMMENT  ==========
 exports.toggleLikeComment = async (req, res) => {
   try {
     const postId = req.params.id;
