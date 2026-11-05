@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const messageController = require('../controllers/Message');
 const { isAuthenticatedUser } = require('../middlewares/auth');
-const upload = require('../utils/multer');
+const upload = require('../utils/Multer');
 
 // ===================== MESSAGE ROUTES =====================
 
