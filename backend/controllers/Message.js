@@ -1,6 +1,6 @@
 // Mapa-Milihan/backend/controllers/Message.js
 const { Message } = require('../models/Message');
-const { uploadToCloudinary } = require('../utils/cloudinary');
+const { uploadToCloudinary } = require('../utils/Cloudinary');
 const mongoose = require('mongoose');
 const fs = require('fs');
 const os = require('os');
